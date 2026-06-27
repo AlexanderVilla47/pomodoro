@@ -92,6 +92,10 @@ export function upsertTracks(db: DatabaseSync, playlistId: number, tracks: NewTr
   }
 }
 
+export function deletePlaylist(db: DatabaseSync, playlistId: string): void {
+  db.prepare(`DELETE FROM playlists WHERE playlist_id = ?`).run(playlistId);
+}
+
 export function getTracksByPlaylist(db: DatabaseSync, playlistId: string): Track[] {
   const playlist = getPlaylist(db, playlistId);
   if (!playlist) return [];
