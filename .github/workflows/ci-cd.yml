@@ -48,30 +48,37 @@ jobs:
       - name: Build y deploy en el server ARM
         uses: appleboy/ssh-action@v1
         env:
-          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_PATH: ${{ github.repository }}
           COMMIT_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: REPO_URL,COMMIT_SHA
+          envs: GIT_TOKEN,REPO_PATH,COMMIT_SHA
           command_timeout: 20m
           script: |
-            cd /opt/pomodoro
+            SRC=/opt/pomodoro-src
+            CLONE_URL="https://x-access-token:${GIT_TOKEN}@github.com/${REPO_PATH}.git"
 
-            # Sync código (primera vez: init, siguientes: pull)
-            if [ ! -d ".git" ]; then
-              git init
-              git remote add origin "$REPO_URL"
+            # Sync código (primera vez: clone, siguientes: pull)
+            if [ -d "$SRC/.git" ]; then
+              cd "$SRC"
+              git fetch origin main --depth=1
+              git reset --hard FETCH_HEAD
+            else
+              rm -rf "$SRC"
+              git clone --depth=1 "$CLONE_URL" "$SRC"
             fi
-            git fetch origin main --depth=1
-            git reset --hard FETCH_HEAD
 
-            # Build nativo en ARM (sin QEMU, rápido)
-            docker build -t pomodoro:latest .
+            # Build nativo en ARM (sin QEMU, ~3 min)
+            docker build -t pomodoro:latest "$SRC"
 
-            # Reiniciar con la nueva imagen
+            # Actualizar compose/nginx y reiniciar
+            cp "$SRC/docker-compose.yml" /opt/pomodoro/
+            cp "$SRC/nginx.conf" /opt/pomodoro/
+            cd /opt/pomodoro
             docker compose up -d --remove-orphans
             docker image prune -f
 
-            echo "Deploy OK — commit $COMMIT_SHA"
+            echo "Deploy OK — $COMMIT_SHA"
