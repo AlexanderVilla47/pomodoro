@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import { TimerRing } from "../TimerRing";
 
-const RADIUS = 120;
+const RADIUS = 150;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 describe("TimerRing", () => {

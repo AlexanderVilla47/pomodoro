@@ -55,6 +55,7 @@ export function TimerRing({ remaining, total, phase, accentColor = "var(--color-
       />
 
       <circle
+        className="progress"
         cx={SIZE / 2}
         cy={SIZE / 2}
         r={RADIUS}
