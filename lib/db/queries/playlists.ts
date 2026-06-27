@@ -1,4 +1,6 @@
-import type { DatabaseSync } from "node:sqlite";
+import type postgres from "postgres";
+
+type Sql = ReturnType<typeof postgres>;
 
 export interface Playlist {
   id: number;
@@ -20,107 +22,87 @@ export interface Track {
 
 type NewTrack = Omit<Track, "id" | "playlist_id">;
 
-type RawPlaylist = {
-  id: number | bigint;
-  playlist_id: string;
-  title: string;
-  thumbnail_url: string | null;
-  cached_at: string;
-  created_at: string;
-};
-
-function toPlaylist(row: RawPlaylist): Playlist {
-  return { ...row, id: Number(row.id) };
-}
-
-export function upsertPlaylist(
-  db: DatabaseSync,
+export async function upsertPlaylist(
+  sql: Sql,
   data: { playlist_id: string; title: string; thumbnail_url: string | null }
-): Playlist {
-  db.prepare(`
+): Promise<Playlist> {
+  const [row] = await sql<Playlist[]>`
     INSERT INTO playlists (playlist_id, title, thumbnail_url, cached_at)
-    VALUES (?, ?, ?, datetime('now'))
-    ON CONFLICT(playlist_id) DO UPDATE SET
-      title = excluded.title,
-      thumbnail_url = excluded.thumbnail_url,
-      cached_at = datetime('now')
-  `).run(data.playlist_id, data.title, data.thumbnail_url ?? null);
-
-  const row = db
-    .prepare("SELECT * FROM playlists WHERE playlist_id = ?")
-    .get(data.playlist_id) as RawPlaylist;
-
-  return toPlaylist(row);
+    VALUES (${data.playlist_id}, ${data.title}, ${data.thumbnail_url}, NOW())
+    ON CONFLICT (playlist_id) DO UPDATE SET
+      title = EXCLUDED.title,
+      thumbnail_url = EXCLUDED.thumbnail_url,
+      cached_at = NOW()
+    RETURNING
+      id, playlist_id, title, thumbnail_url,
+      cached_at::text AS cached_at,
+      created_at::text AS created_at
+  `;
+  return row;
 }
 
-export function getPlaylist(db: DatabaseSync, playlistId: string): Playlist | null {
-  const row = db
-    .prepare("SELECT * FROM playlists WHERE playlist_id = ?")
-    .get(playlistId) as RawPlaylist | undefined;
-
-  return row ? toPlaylist(row) : null;
+export async function getPlaylist(sql: Sql, playlistId: string): Promise<Playlist | null> {
+  const rows = await sql<Playlist[]>`
+    SELECT id, playlist_id, title, thumbnail_url,
+           cached_at::text AS cached_at,
+           created_at::text AS created_at
+    FROM playlists WHERE playlist_id = ${playlistId}
+  `;
+  return rows[0] ?? null;
 }
 
-export function isPlaylistStale(db: DatabaseSync, playlistId: string): boolean {
-  const row = db
-    .prepare(`
-      SELECT cached_at FROM playlists
-      WHERE playlist_id = ?
-        AND cached_at > datetime('now', '-24 hours')
-    `)
-    .get(playlistId) as { cached_at: string } | undefined;
-
-  return row === undefined;
+export async function getPlaylists(sql: Sql): Promise<Playlist[]> {
+  return sql<Playlist[]>`
+    SELECT id, playlist_id, title, thumbnail_url,
+           cached_at::text AS cached_at,
+           created_at::text AS created_at
+    FROM playlists ORDER BY created_at DESC
+  `;
 }
 
-export function upsertTracks(db: DatabaseSync, playlistId: number, tracks: NewTrack[]): void {
-  db.prepare("DELETE FROM tracks WHERE playlist_id = ?").run(playlistId);
-
-  const insert = db.prepare(`
-    INSERT INTO tracks (playlist_id, video_id, title, duration_seconds, position)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
-  for (const track of tracks) {
-    insert.run(
-      playlistId,
-      track.video_id,
-      track.title,
-      track.duration_seconds ?? null,
-      track.position
-    );
-  }
+export async function isPlaylistStale(sql: Sql, playlistId: string): Promise<boolean> {
+  const rows = await sql`
+    SELECT 1 FROM playlists
+    WHERE playlist_id = ${playlistId}
+      AND cached_at > NOW() - interval '24 hours'
+  `;
+  return rows.length === 0;
 }
 
-export function deletePlaylist(db: DatabaseSync, playlistId: string): void {
-  db.prepare(`DELETE FROM playlists WHERE playlist_id = ?`).run(playlistId);
+export async function upsertTracks(sql: Sql, playlistId: number, tracks: NewTrack[]): Promise<void> {
+  await sql`DELETE FROM tracks WHERE playlist_id = ${playlistId}`;
+
+  if (tracks.length === 0) return;
+
+  await sql`
+    INSERT INTO tracks ${sql(
+      tracks.map((t) => ({
+        playlist_id: playlistId,
+        video_id: t.video_id,
+        title: t.title,
+        duration_seconds: t.duration_seconds,
+        position: t.position,
+      }))
+    )}
+  `;
 }
 
-export function getTracksByPlaylist(db: DatabaseSync, playlistId: string): Track[] {
-  const playlist = getPlaylist(db, playlistId);
+export async function deletePlaylist(sql: Sql, playlistId: string): Promise<void> {
+  await sql`DELETE FROM playlists WHERE playlist_id = ${playlistId}`;
+}
+
+export async function updatePlaylistCachedAt(sql: Sql, playlistId: string): Promise<void> {
+  await sql`UPDATE playlists SET cached_at = NOW() WHERE playlist_id = ${playlistId}`;
+}
+
+export async function getTracksByPlaylist(sql: Sql, playlistId: string): Promise<Track[]> {
+  const playlist = await getPlaylist(sql, playlistId);
   if (!playlist) return [];
 
-  const rows = db
-    .prepare(`
-      SELECT * FROM tracks
-      WHERE playlist_id = ?
-      ORDER BY position ASC
-    `)
-    .all(playlist.id) as Array<{
-      id: number | bigint;
-      playlist_id: number | bigint;
-      video_id: string;
-      title: string;
-      duration_seconds: number | null;
-      position: number | bigint;
-    }>;
-
-  return rows.map((r) => ({
-    id: Number(r.id),
-    playlist_id: Number(r.playlist_id),
-    video_id: r.video_id,
-    title: r.title,
-    duration_seconds: r.duration_seconds,
-    position: Number(r.position),
-  }));
+  return sql<Track[]>`
+    SELECT id, playlist_id, video_id, title, duration_seconds, position
+    FROM tracks
+    WHERE playlist_id = ${playlist.id}
+    ORDER BY position ASC
+  `;
 }

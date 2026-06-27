@@ -12,6 +12,6 @@ export async function DELETE(
   }
 
   const db = getDb();
-  deleteLabel(db, numId);
+  await deleteLabel(db, numId);
   return new Response(null, { status: 204 });
 }

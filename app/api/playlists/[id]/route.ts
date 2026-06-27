@@ -7,6 +7,6 @@ export async function DELETE(
 ) {
   const { id } = await props.params;
   const db = getDb();
-  deletePlaylist(db, id);
+  await deletePlaylist(db, id);
   return new Response(null, { status: 204 });
 }

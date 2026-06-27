@@ -8,8 +8,10 @@ export async function GET(req: Request) {
   const offset = isNaN(tzOffset) ? 0 : tzOffset;
 
   const db = getDb();
-  const today = getStatsForToday(db, offset);
-  const week = getStatsForWeek(db, offset);
+  const [today, week] = await Promise.all([
+    getStatsForToday(db, offset),
+    getStatsForWeek(db, offset),
+  ]);
 
   return Response.json({ today, week });
 }

@@ -1,19 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { DatabaseSync } from "node:sqlite";
-import { runMigrations } from "@/lib/db/migrations";
 
-let mockDb: DatabaseSync;
-
-vi.mock("@/lib/db/index", () => ({
-  getDb: () => mockDb,
+vi.mock("@/lib/db/index", () => ({ getDb: () => ({}) }));
+vi.mock("@/lib/db/queries/sessions", () => ({
+  insertSession: vi.fn(),
 }));
 
 import { POST } from "../sessions/route";
+import { insertSession } from "@/lib/db/queries/sessions";
 
-beforeEach(() => {
-  mockDb = new DatabaseSync(":memory:");
-  runMigrations(mockDb);
-});
+const mockInsert = vi.mocked(insertSession);
 
 function now() {
   return new Date().toISOString();
@@ -30,6 +25,11 @@ function makeWorkSession(overrides = {}) {
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockInsert.mockResolvedValue(1);
+});
 
 describe("POST /api/sessions", () => {
   it("inserta sesión completada y retorna 201 con id", async () => {

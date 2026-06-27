@@ -1,16 +1,15 @@
-import { DatabaseSync } from "node:sqlite";
-import { runMigrations } from "./migrations";
+import postgres from "postgres";
 
 declare global {
   // eslint-disable-next-line no-var
-  var __db: DatabaseSync | undefined;
+  var __sql: ReturnType<typeof postgres> | undefined;
 }
 
-export function getDb(): DatabaseSync {
-  if (!globalThis.__db) {
-    const path = process.env.DB_PATH ?? "/data/pomodoro.db";
-    globalThis.__db = new DatabaseSync(path);
-    runMigrations(globalThis.__db);
+export function getDb(): ReturnType<typeof postgres> {
+  if (!globalThis.__sql) {
+    globalThis.__sql = postgres(process.env.DATABASE_URL!, {
+      ssl: process.env.DATABASE_URL?.includes(".supabase.co") ? "require" : false,
+    });
   }
-  return globalThis.__db;
+  return globalThis.__sql;
 }

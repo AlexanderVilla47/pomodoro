@@ -10,8 +10,10 @@ export async function GET(req: Request) {
   const offset = isNaN(tzOffset) ? 0 : tzOffset;
 
   const db = getDb();
-  const days = getDailyStatsForYear(db, isNaN(year) ? currentYear : year, offset);
-  const years = getYearsWithData(db);
+  const [days, years] = await Promise.all([
+    getDailyStatsForYear(db, isNaN(year) ? currentYear : year, offset),
+    getYearsWithData(db),
+  ]);
 
   if (!years.includes(currentYear)) years.unshift(currentYear);
 

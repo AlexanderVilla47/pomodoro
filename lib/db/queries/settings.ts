@@ -1,4 +1,6 @@
-import type { DatabaseSync } from "node:sqlite";
+import type postgres from "postgres";
+
+type Sql = ReturnType<typeof postgres>;
 
 export interface Settings {
   id: number;
@@ -20,22 +22,16 @@ type RawRow = {
   notification_sound_enabled: number;
 };
 
-function toSettings(row: RawRow): Settings {
+export async function getSettings(sql: Sql): Promise<Settings> {
+  const [row] = await sql<[RawRow]>`SELECT * FROM settings WHERE id = 1`;
   return {
     ...row,
     notification_sound_enabled: row.notification_sound_enabled === 1,
   };
 }
 
-export function getSettings(db: DatabaseSync): Settings {
-  const row = db.prepare("SELECT * FROM settings WHERE id = 1").get() as RawRow;
-  return toSettings(row);
-}
-
-export function upsertSettings(db: DatabaseSync, patch: SettingsPatch): Settings {
-  const current = db
-    .prepare("SELECT * FROM settings WHERE id = 1")
-    .get() as RawRow;
+export async function upsertSettings(sql: Sql, patch: SettingsPatch): Promise<Settings> {
+  const current = await getSettings(sql);
 
   const next = {
     work_duration: patch.work_duration ?? current.work_duration,
@@ -47,28 +43,25 @@ export function upsertSettings(db: DatabaseSync, patch: SettingsPatch): Settings
         ? patch.notification_sound_enabled
           ? 1
           : 0
-        : current.notification_sound_enabled,
+        : current.notification_sound_enabled
+          ? 1
+          : 0,
   };
 
-  db.prepare(`
+  await sql`
     UPDATE settings SET
-      work_duration = ?,
-      short_break_duration = ?,
-      long_break_duration = ?,
-      long_break_interval = ?,
-      notification_sound_enabled = ?,
-      updated_at = datetime('now')
+      work_duration = ${next.work_duration},
+      short_break_duration = ${next.short_break_duration},
+      long_break_duration = ${next.long_break_duration},
+      long_break_interval = ${next.long_break_interval},
+      notification_sound_enabled = ${next.notification_sound_enabled},
+      updated_at = NOW()
     WHERE id = 1
-  `).run(
-    next.work_duration,
-    next.short_break_duration,
-    next.long_break_duration,
-    next.long_break_interval,
-    next.notification_sound_enabled
-  );
+  `;
 
-  return toSettings({
+  return {
     id: 1,
     ...next,
-  });
+    notification_sound_enabled: next.notification_sound_enabled === 1,
+  };
 }
