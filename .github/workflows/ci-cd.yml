@@ -78,7 +78,7 @@ jobs:
             cp "$SRC/docker-compose.yml" /opt/pomodoro/
             cp "$SRC/nginx.conf" /opt/pomodoro/
             cd /opt/pomodoro
-            docker compose up -d --remove-orphans
+            docker compose up -d --force-recreate --remove-orphans
             docker image prune -f
 
             echo "Deploy OK — $COMMIT_SHA"
