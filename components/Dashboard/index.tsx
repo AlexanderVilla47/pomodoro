@@ -55,36 +55,40 @@ export function Dashboard({ refreshTrigger }: DashboardProps) {
   }, [expanded, refreshTrigger]);
 
   return (
-    <div className="flex flex-col gap-3 p-5 rounded-2xl bg-white/5 border border-white/10">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">Progreso</h3>
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          className="text-xs text-white/30 hover:text-white/60 transition-colors"
-        >
-          {expanded ? "▴ ocultar" : "▾ historial"}
-        </button>
+    <div className="relative">
+      {/* Card principal — altura fija, no se mueve */}
+      <div className="flex flex-col gap-3 p-5 rounded-2xl bg-white/5 border border-white/10">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">Progreso</h3>
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="text-xs text-white/30 hover:text-white/60 transition-colors"
+          >
+            {expanded ? "▴ ocultar" : "▾ historial"}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <StatsCard
+            label="Hoy"
+            count={stats?.today.count ?? 0}
+            totalSeconds={stats?.today.total_seconds ?? 0}
+          />
+          <StatsCard
+            label="Esta semana"
+            count={stats?.week.count ?? 0}
+            totalSeconds={stats?.week.total_seconds ?? 0}
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <StatsCard
-          label="Hoy"
-          count={stats?.today.count ?? 0}
-          totalSeconds={stats?.today.total_seconds ?? 0}
-        />
-        <StatsCard
-          label="Esta semana"
-          count={stats?.week.count ?? 0}
-          totalSeconds={stats?.week.total_seconds ?? 0}
-        />
-      </div>
-
+      {/* Historial: flota encima del MusicPanel, no desplaza el layout */}
       {expanded && (
-        <>
+        <div className="absolute top-full left-0 right-0 mt-1 z-10 p-5 rounded-2xl bg-[var(--color-bg)] border border-white/10 max-h-[60vh] overflow-y-auto no-scrollbar">
           <ContributionGraph />
 
           {labelStats.length > 0 && (
-            <div className="flex flex-col gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-3">
               <span className="text-xs text-white/30 uppercase tracking-wider">Por etiqueta</span>
               <div className="flex flex-col gap-1.5">
                 {labelStats.map((l) => (
@@ -103,7 +107,7 @@ export function Dashboard({ refreshTrigger }: DashboardProps) {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
