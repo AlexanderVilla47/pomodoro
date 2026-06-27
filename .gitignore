@@ -36,9 +36,6 @@ Thumbs.db
 *.njsproj
 *.sln
 
-# Docker
-.dockerignore
-
 # TypeScript build info
 tsconfig.tsbuildinfo
 

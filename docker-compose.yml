@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/alexandervilla47/pomodoro:latest
+    image: pomodoro:latest
     restart: unless-stopped
     environment:
       - PORT=4000
