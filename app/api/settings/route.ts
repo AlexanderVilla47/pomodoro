@@ -3,7 +3,7 @@ import { getSettings, upsertSettings } from "@/lib/db/queries/settings";
 
 export async function GET() {
   const db = getDb();
-  return Response.json(getSettings(db));
+  return Response.json(await getSettings(db));
 }
 
 export async function PUT(req: Request) {
@@ -31,6 +31,6 @@ export async function PUT(req: Request) {
   }
 
   const db = getDb();
-  const updated = upsertSettings(db, body as Parameters<typeof upsertSettings>[1]);
+  const updated = await upsertSettings(db, body as Parameters<typeof upsertSettings>[1]);
   return Response.json(updated);
 }

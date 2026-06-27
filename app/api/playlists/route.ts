@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/index";
-import { upsertPlaylist, upsertTracks } from "@/lib/db/queries/playlists";
+import { upsertPlaylist, upsertTracks, getPlaylists } from "@/lib/db/queries/playlists";
 import { extractPlaylistId } from "@/lib/youtube/parseUrl";
 import { fetchPlaylistItems, fetchPlaylistInfo } from "@/lib/youtube/client";
 
@@ -31,13 +31,13 @@ export async function POST(req: Request) {
   ]);
 
   const db = getDb();
-  const playlist = upsertPlaylist(db, {
+  const playlist = await upsertPlaylist(db, {
     playlist_id: playlistId,
     title: info.title,
     thumbnail_url: info.thumbnailUrl,
   });
 
-  upsertTracks(
+  await upsertTracks(
     db,
     playlist.id,
     tracks.map((t) => ({
@@ -53,6 +53,5 @@ export async function POST(req: Request) {
 
 export async function GET() {
   const db = getDb();
-  const playlists = db.prepare("SELECT * FROM playlists ORDER BY created_at DESC").all();
-  return Response.json(playlists);
+  return Response.json(await getPlaylists(db));
 }

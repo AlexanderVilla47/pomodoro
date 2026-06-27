@@ -102,9 +102,8 @@ jobs:
               -p 80:4000 \
               --name pomodoro \
               --restart unless-stopped \
-              -v /opt/pomodoro/data:/data \
               -e PORT=4000 \
-              -e DB_PATH=/data/pomodoro.db \
+              -e DATABASE_URL="$(grep -m1 DATABASE_URL /opt/pomodoro/.env | cut -d'=' -f2-)" \
               -e YOUTUBE_API_KEY="$(grep -m1 YOUTUBE_API_KEY /opt/pomodoro/.env | cut -d'=' -f2-)" \
               "$IMAGE"
 

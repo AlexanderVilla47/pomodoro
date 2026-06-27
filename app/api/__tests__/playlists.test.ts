@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { DatabaseSync } from "node:sqlite";
-import { runMigrations } from "@/lib/db/migrations";
 
-let mockDb: DatabaseSync;
-
-vi.mock("@/lib/db/index", () => ({
-  getDb: () => mockDb,
+vi.mock("@/lib/db/index", () => ({ getDb: () => ({}) }));
+vi.mock("@/lib/db/queries/playlists", () => ({
+  upsertPlaylist: vi.fn(),
+  upsertTracks: vi.fn(),
+  getPlaylists: vi.fn(),
 }));
-
 vi.mock("@/lib/youtube/client", () => ({
   fetchPlaylistItems: vi.fn(),
   fetchPlaylistInfo: vi.fn(),
@@ -21,20 +19,34 @@ vi.mock("@/lib/youtube/client", () => ({
 }));
 
 import { POST, GET } from "../playlists/route";
+import { upsertPlaylist, upsertTracks, getPlaylists } from "@/lib/db/queries/playlists";
 import { fetchPlaylistItems, fetchPlaylistInfo } from "@/lib/youtube/client";
 
+const mockUpsertPlaylist = vi.mocked(upsertPlaylist);
+const mockUpsertTracks = vi.mocked(upsertTracks);
+const mockGetPlaylists = vi.mocked(getPlaylists);
 const mockItems = vi.mocked(fetchPlaylistItems);
 const mockInfo = vi.mocked(fetchPlaylistInfo);
 
+const FAKE_PLAYLIST = {
+  id: 1,
+  playlist_id: "PLtest123",
+  title: "Lo-fi Hip Hop",
+  thumbnail_url: "https://i.ytimg.com/thumb.jpg",
+  cached_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+};
+
 beforeEach(() => {
-  mockDb = new DatabaseSync(":memory:");
-  runMigrations(mockDb);
   vi.stubEnv("YOUTUBE_API_KEY", "test-key");
   mockInfo.mockResolvedValue({ title: "Lo-fi Hip Hop", thumbnailUrl: "https://i.ytimg.com/thumb.jpg" });
   mockItems.mockResolvedValue([
     { videoId: "v1", title: "Track 1", thumbnailUrl: null, position: 0 },
     { videoId: "v2", title: "Track 2", thumbnailUrl: null, position: 1 },
   ]);
+  mockUpsertPlaylist.mockResolvedValue(FAKE_PLAYLIST);
+  mockUpsertTracks.mockResolvedValue(undefined);
+  mockGetPlaylists.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -109,12 +121,7 @@ describe("GET /api/playlists", () => {
   });
 
   it("retorna las playlists cacheadas", async () => {
-    const postReq = new Request("http://localhost/api/playlists", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: "https://www.youtube.com/playlist?list=PLtest123" }),
-    });
-    await POST(postReq);
+    mockGetPlaylists.mockResolvedValue([FAKE_PLAYLIST]);
     const res = await GET();
     const body = await res.json();
     expect(body).toHaveLength(1);

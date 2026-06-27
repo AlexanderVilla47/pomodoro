@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const id = insertSession(db, {
+  const id = await insertSession(db, {
     type,
     started_at,
     ended_at,

@@ -6,10 +6,10 @@ export async function GET(req: Request) {
   const db = getDb();
 
   if (searchParams.get("stats") === "1") {
-    return Response.json(getLabelStats(db));
+    return Response.json(await getLabelStats(db));
   }
 
-  return Response.json(getLabels(db));
+  return Response.json(await getLabels(db));
 }
 
 export async function POST(req: Request) {
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   const db = getDb();
   try {
-    const label = createLabel(db, name.trim(), color);
+    const label = await createLabel(db, name.trim(), color);
     return Response.json(label, { status: 201 });
   } catch {
     return Response.json({ error: "Label name already exists" }, { status: 409 });

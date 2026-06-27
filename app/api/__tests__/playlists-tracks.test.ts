@@ -1,17 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { DatabaseSync } from "node:sqlite";
-import { runMigrations } from "@/lib/db/migrations";
-import { upsertPlaylist, upsertTracks } from "@/lib/db/queries/playlists";
 
-let mockDb: DatabaseSync;
-
-vi.mock("@/lib/db/index", () => ({
-  getDb: () => mockDb,
+vi.mock("@/lib/db/index", () => ({ getDb: () => ({}) }));
+vi.mock("@/lib/db/queries/playlists", () => ({
+  getPlaylist: vi.fn(),
+  isPlaylistStale: vi.fn(),
+  upsertTracks: vi.fn(),
+  getTracksByPlaylist: vi.fn(),
+  updatePlaylistCachedAt: vi.fn(),
 }));
-
 vi.mock("@/lib/youtube/client", () => ({
   fetchPlaylistItems: vi.fn(),
-  fetchPlaylistInfo: vi.fn(),
   YouTubeApiError: class YouTubeApiError extends Error {
     status: number;
     constructor(message: string, status: number) {
@@ -22,19 +20,44 @@ vi.mock("@/lib/youtube/client", () => ({
 }));
 
 import { GET } from "../playlists/[id]/tracks/route";
-import { fetchPlaylistItems, fetchPlaylistInfo } from "@/lib/youtube/client";
+import {
+  getPlaylist,
+  isPlaylistStale,
+  upsertTracks,
+  getTracksByPlaylist,
+  updatePlaylistCachedAt,
+} from "@/lib/db/queries/playlists";
+import { fetchPlaylistItems } from "@/lib/youtube/client";
 
+const mockGetPlaylist = vi.mocked(getPlaylist);
+const mockIsStale = vi.mocked(isPlaylistStale);
+const mockUpsertTracks = vi.mocked(upsertTracks);
+const mockGetTracks = vi.mocked(getTracksByPlaylist);
+const mockUpdateCachedAt = vi.mocked(updatePlaylistCachedAt);
 const mockItems = vi.mocked(fetchPlaylistItems);
-const mockInfo = vi.mocked(fetchPlaylistInfo);
+
+const FAKE_PLAYLIST = {
+  id: 1,
+  playlist_id: "PLtest123",
+  title: "Lo-fi",
+  thumbnail_url: null,
+  cached_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+};
+
+const FAKE_TRACKS = [
+  { id: 1, playlist_id: 1, video_id: "v1", title: "Track 1", duration_seconds: null, position: 0 },
+  { id: 2, playlist_id: 1, video_id: "v2", title: "Track 2", duration_seconds: 180, position: 1 },
+];
 
 beforeEach(() => {
-  mockDb = new DatabaseSync(":memory:");
-  runMigrations(mockDb);
   vi.stubEnv("YOUTUBE_API_KEY", "test-key");
-  mockInfo.mockResolvedValue({ title: "Lo-fi", thumbnailUrl: null });
-  mockItems.mockResolvedValue([
-    { videoId: "v1", title: "Track 1", thumbnailUrl: null, position: 0 },
-  ]);
+  mockGetPlaylist.mockResolvedValue(FAKE_PLAYLIST);
+  mockIsStale.mockResolvedValue(false);
+  mockGetTracks.mockResolvedValue(FAKE_TRACKS);
+  mockUpsertTracks.mockResolvedValue(undefined);
+  mockUpdateCachedAt.mockResolvedValue(undefined);
+  mockItems.mockResolvedValue([{ videoId: "v1", title: "Track 1", thumbnailUrl: null, position: 0 }]);
 });
 
 afterEach(() => {
@@ -44,6 +67,7 @@ afterEach(() => {
 
 describe("GET /api/playlists/[id]/tracks", () => {
   it("retorna 404 si la playlist no existe", async () => {
+    mockGetPlaylist.mockResolvedValue(null);
     const res = await GET(
       new Request("http://localhost/api/playlists/PLno-existe/tracks"),
       { params: Promise.resolve({ id: "PLno-existe" }) }
@@ -52,16 +76,6 @@ describe("GET /api/playlists/[id]/tracks", () => {
   });
 
   it("retorna los tracks de una playlist fresca (no stale)", async () => {
-    const p = upsertPlaylist(mockDb, {
-      playlist_id: "PLtest123",
-      title: "Lo-fi",
-      thumbnail_url: null,
-    });
-    upsertTracks(mockDb, p.id, [
-      { video_id: "v1", title: "Track 1", duration_seconds: null, position: 0 },
-      { video_id: "v2", title: "Track 2", duration_seconds: 180, position: 1 },
-    ]);
-
     const res = await GET(
       new Request("http://localhost/api/playlists/PLtest123/tracks"),
       { params: Promise.resolve({ id: "PLtest123" }) }
@@ -74,43 +88,23 @@ describe("GET /api/playlists/[id]/tracks", () => {
   });
 
   it("re-fetcha los tracks si la playlist está stale (>24h)", async () => {
-    const p = upsertPlaylist(mockDb, {
-      playlist_id: "PLstale",
-      title: "Lo-fi",
-      thumbnail_url: null,
-    });
-    upsertTracks(mockDb, p.id, [
-      { video_id: "old", title: "Old Track", duration_seconds: null, position: 0 },
-    ]);
-    mockDb
-      .prepare("UPDATE playlists SET cached_at = datetime('now', '-25 hours') WHERE playlist_id = ?")
-      .run("PLstale");
-
+    mockIsStale.mockResolvedValue(true);
     const res = await GET(
-      new Request("http://localhost/api/playlists/PLstale/tracks"),
-      { params: Promise.resolve({ id: "PLstale" }) }
+      new Request("http://localhost/api/playlists/PLtest123/tracks"),
+      { params: Promise.resolve({ id: "PLtest123" }) }
     );
     expect(res.status).toBe(200);
-    expect(mockItems).toHaveBeenCalledWith("PLstale", "test-key");
+    expect(mockItems).toHaveBeenCalledWith("PLtest123", "test-key");
+    expect(mockUpsertTracks).toHaveBeenCalled();
+    expect(mockUpdateCachedAt).toHaveBeenCalled();
   });
 
   it("retorna 503 si playlist es stale y no hay API key", async () => {
     vi.stubEnv("YOUTUBE_API_KEY", "");
-    const p = upsertPlaylist(mockDb, {
-      playlist_id: "PLstale2",
-      title: "Lo-fi",
-      thumbnail_url: null,
-    });
-    upsertTracks(mockDb, p.id, [
-      { video_id: "old", title: "Old Track", duration_seconds: null, position: 0 },
-    ]);
-    mockDb
-      .prepare("UPDATE playlists SET cached_at = datetime('now', '-25 hours') WHERE playlist_id = ?")
-      .run("PLstale2");
-
+    mockIsStale.mockResolvedValue(true);
     const res = await GET(
-      new Request("http://localhost/api/playlists/PLstale2/tracks"),
-      { params: Promise.resolve({ id: "PLstale2" }) }
+      new Request("http://localhost/api/playlists/PLtest123/tracks"),
+      { params: Promise.resolve({ id: "PLtest123" }) }
     );
     expect(res.status).toBe(503);
   });

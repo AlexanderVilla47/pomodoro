@@ -1,5 +1,11 @@
 import { getDb } from "@/lib/db/index";
-import { getPlaylist, isPlaylistStale, upsertTracks, getTracksByPlaylist } from "@/lib/db/queries/playlists";
+import {
+  getPlaylist,
+  isPlaylistStale,
+  upsertTracks,
+  getTracksByPlaylist,
+  updatePlaylistCachedAt,
+} from "@/lib/db/queries/playlists";
 import { fetchPlaylistItems } from "@/lib/youtube/client";
 
 export async function GET(
@@ -9,19 +15,19 @@ export async function GET(
   const { id: playlistId } = await props.params;
   const db = getDb();
 
-  const playlist = getPlaylist(db, playlistId);
+  const playlist = await getPlaylist(db, playlistId);
   if (!playlist) {
     return Response.json({ error: "Playlist not found" }, { status: 404 });
   }
 
-  if (isPlaylistStale(db, playlistId)) {
+  if (await isPlaylistStale(db, playlistId)) {
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (!apiKey) {
       return Response.json({ error: "YouTube API not configured, cannot refresh stale playlist" }, { status: 503 });
     }
 
     const tracks = await fetchPlaylistItems(playlistId, apiKey);
-    upsertTracks(
+    await upsertTracks(
       db,
       playlist.id,
       tracks.map((t) => ({
@@ -32,8 +38,8 @@ export async function GET(
       }))
     );
 
-    db.prepare("UPDATE playlists SET cached_at = datetime('now') WHERE playlist_id = ?").run(playlistId);
+    await updatePlaylistCachedAt(db, playlistId);
   }
 
-  return Response.json(getTracksByPlaylist(db, playlistId));
+  return Response.json(await getTracksByPlaylist(db, playlistId));
 }

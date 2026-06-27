@@ -1,18 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { DatabaseSync } from "node:sqlite";
-import { runMigrations } from "@/lib/db/migrations";
 
-let mockDb: DatabaseSync;
-
-vi.mock("@/lib/db/index", () => ({
-  getDb: () => mockDb,
+vi.mock("@/lib/db/index", () => ({ getDb: () => ({}) }));
+vi.mock("@/lib/db/queries/settings", () => ({
+  getSettings: vi.fn(),
+  upsertSettings: vi.fn(),
 }));
 
 import { GET, PUT } from "../settings/route";
+import { getSettings, upsertSettings } from "@/lib/db/queries/settings";
+
+const mockGet = vi.mocked(getSettings);
+const mockUpsert = vi.mocked(upsertSettings);
+
+const DEFAULT_SETTINGS = {
+  id: 1,
+  work_duration: 1500,
+  short_break_duration: 300,
+  long_break_duration: 900,
+  long_break_interval: 4,
+  notification_sound_enabled: true,
+};
 
 beforeEach(() => {
-  mockDb = new DatabaseSync(":memory:");
-  runMigrations(mockDb);
+  vi.clearAllMocks();
+  mockGet.mockResolvedValue(DEFAULT_SETTINGS);
+  mockUpsert.mockImplementation(async (_db, patch) => ({ ...DEFAULT_SETTINGS, ...patch }));
 });
 
 describe("GET /api/settings", () => {
@@ -30,6 +42,7 @@ describe("GET /api/settings", () => {
 
 describe("PUT /api/settings", () => {
   it("actualiza work_duration y retorna la config actualizada", async () => {
+    mockUpsert.mockResolvedValue({ ...DEFAULT_SETTINGS, work_duration: 1800 });
     const req = new Request("http://localhost/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -43,6 +56,7 @@ describe("PUT /api/settings", () => {
   });
 
   it("actualiza múltiples campos a la vez", async () => {
+    mockUpsert.mockResolvedValue({ ...DEFAULT_SETTINGS, short_break_duration: 600, long_break_interval: 6 });
     const req = new Request("http://localhost/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
