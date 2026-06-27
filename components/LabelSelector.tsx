@@ -11,7 +11,7 @@ const PRESET_COLORS = [
   "#6BCB77",
 ];
 
-interface Label {
+export interface Label {
   id: number;
   name: string;
   color: string;
@@ -19,7 +19,7 @@ interface Label {
 
 interface Props {
   selectedId: number | null;
-  onChange: (id: number | null) => void;
+  onChange: (label: Label | null) => void;
 }
 
 export function LabelSelector({ selectedId, onChange }: Props) {
@@ -54,7 +54,7 @@ export function LabelSelector({ selectedId, onChange }: Props) {
       setLabels((prev) =>
         [...prev, label].sort((a, b) => a.name.localeCompare(b.name))
       );
-      onChange(label.id);
+      onChange(label);
       setCreating(false);
       setNewName("");
       setNewColor(PRESET_COLORS[0]);
@@ -91,7 +91,7 @@ export function LabelSelector({ selectedId, onChange }: Props) {
           return (
             <button
               key={label.id}
-              onClick={() => onChange(active ? null : label.id)}
+              onClick={() => onChange(active ? null : label)}
               className="group relative px-3 py-1 rounded-full text-xs transition-all border"
               style={
                 active

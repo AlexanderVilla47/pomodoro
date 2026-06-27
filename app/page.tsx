@@ -8,6 +8,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { SettingsPanel } from "@/components/Settings/SettingsPanel";
 import { Confetti } from "@/components/Confetti";
 import { LabelSelector } from "@/components/LabelSelector";
+import type { Label } from "@/components/LabelSelector";
 import { useSettings } from "@/hooks/useSettings";
 import { requestNotificationPermission } from "@/lib/notifications";
 import type { Settings } from "@/lib/db/queries/settings";
@@ -17,7 +18,7 @@ function AppContent() {
   const [statsVersion, setStatsVersion] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [selectedLabelId, setSelectedLabelId] = useState<number | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
 
   const handleSessionComplete = useCallback(() => {
     setStatsVersion((v) => v + 1);
@@ -35,7 +36,7 @@ function AppContent() {
     <TimerProvider
       settings={settings}
       onSessionLogged={handleSessionComplete}
-      selectedLabelId={selectedLabelId}
+      selectedLabelId={selectedLabel?.id ?? null}
     >
       <div className="h-screen overflow-hidden bg-[var(--color-bg)] text-white">
         <div className="h-full max-w-6xl mx-auto px-4 flex gap-8">
@@ -43,8 +44,8 @@ function AppContent() {
           {/* Izquierda: timer + selector de etiqueta */}
           <div className="flex-1 flex flex-col items-center justify-center gap-6 relative">
             <Confetti trigger={showConfetti} />
-            <PomodoroTimer />
-            <LabelSelector selectedId={selectedLabelId} onChange={setSelectedLabelId} />
+            <PomodoroTimer labelColor={selectedLabel?.color} />
+            <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={setSelectedLabel} />
           </div>
 
           {/* Derecha: columna flex, MusicPanel toma el espacio restante */}
@@ -54,12 +55,10 @@ function AppContent() {
               <Dashboard refreshTrigger={statsVersion} />
             </div>
 
-            {/* MusicPanel crece para llenar lo que queda */}
             <div className="flex-1 min-h-0">
               <MusicPanel />
             </div>
 
-            {/* Settings: botón fijo abajo, panel flota encima sin romper el layout */}
             <div className="shrink-0 relative">
               <button
                 onClick={() => setSettingsOpen((o) => !o)}

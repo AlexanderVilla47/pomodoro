@@ -11,12 +11,12 @@ interface TimerRingProps {
   remaining: number;
   total: number;
   phase: TimerPhase;
+  accentColor: string;
 }
 
-export function TimerRing({ remaining, total, phase }: TimerRingProps) {
+export function TimerRing({ remaining, total, phase, accentColor }: TimerRingProps) {
   const progress = total > 0 ? remaining / total : 0;
   const offset = (1 - progress) * CIRCUMFERENCE;
-  const color = phase === "work" ? "var(--color-coral)" : "var(--color-mint)";
   const glowId = `glow-${phase}`;
 
   return (
@@ -38,7 +38,6 @@ export function TimerRing({ remaining, total, phase }: TimerRingProps) {
         </filter>
       </defs>
 
-      {/* Fondo oscuro sólido dentro del ring — evita que el fondo "se vea" distinto */}
       <circle
         cx={SIZE / 2}
         cy={SIZE / 2}
@@ -46,7 +45,6 @@ export function TimerRing({ remaining, total, phase }: TimerRingProps) {
         fill="var(--color-bg)"
       />
 
-      {/* Track */}
       <circle
         cx={SIZE / 2}
         cy={SIZE / 2}
@@ -56,13 +54,12 @@ export function TimerRing({ remaining, total, phase }: TimerRingProps) {
         strokeWidth={STROKE_WIDTH}
       />
 
-      {/* Progreso con glow */}
       <circle
         cx={SIZE / 2}
         cy={SIZE / 2}
         r={RADIUS}
         fill="none"
-        stroke={color}
+        stroke={accentColor}
         strokeWidth={STROKE_WIDTH}
         strokeLinecap="round"
         strokeDasharray={CIRCUMFERENCE}

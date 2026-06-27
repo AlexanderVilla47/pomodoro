@@ -4,6 +4,7 @@ import type { TimerStatus } from "@/lib/timer/constants";
 
 interface TimerControlsProps {
   status: TimerStatus;
+  accentColor: string;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -16,6 +17,7 @@ const btnBase =
 
 export function TimerControls({
   status,
+  accentColor,
   onStart,
   onPause,
   onResume,
@@ -28,7 +30,8 @@ export function TimerControls({
         <button
           onClick={onStart}
           aria-label="Start"
-          className={`${btnBase} bg-coral text-white hover:brightness-110`}
+          className={`${btnBase} text-white hover:brightness-110`}
+          style={{ backgroundColor: accentColor }}
         >
           Start
         </button>
@@ -65,7 +68,8 @@ export function TimerControls({
           <button
             onClick={onResume}
             aria-label="Resume"
-            className={`${btnBase} bg-coral text-white hover:brightness-110`}
+            className={`${btnBase} text-white hover:brightness-110`}
+            style={{ backgroundColor: accentColor }}
           >
             Resume
           </button>

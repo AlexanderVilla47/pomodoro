@@ -9,7 +9,11 @@ import { TimerLabel } from "./TimerLabel";
 import { SessionProgress } from "./SessionProgress";
 import { TimerControls } from "./TimerControls";
 
-export function PomodoroTimer() {
+interface PomodoroTimerProps {
+  labelColor?: string;
+}
+
+export function PomodoroTimer({ labelColor }: PomodoroTimerProps) {
   const { status, phase, sessionCount, remaining, start, pause, resume, stop, skip } = useTimer();
   const { settings } = useSettings();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -22,6 +26,12 @@ export function PomodoroTimer() {
         ? settings.short_break_duration * 1000
         : settings.long_break_duration * 1000
     : 1500000;
+
+  // Color del acento: etiqueta durante trabajo, mint durante descanso
+  const accentColor =
+    phase === "work"
+      ? (labelColor ?? "var(--color-coral)")
+      : "var(--color-mint)";
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -74,7 +84,7 @@ export function PomodoroTimer() {
       data-testid="pomodoro-timer"
     >
       <div className="relative flex items-center justify-center">
-        <TimerRing remaining={remaining} total={total} phase={phase} />
+        <TimerRing remaining={remaining} total={total} phase={phase} accentColor={accentColor} />
         <div className="absolute inset-0 flex items-center justify-center">
           <TimerLabel remaining={remaining} phase={phase} />
         </div>
@@ -85,6 +95,7 @@ export function PomodoroTimer() {
       />
       <TimerControls
         status={status}
+        accentColor={accentColor}
         onStart={start}
         onPause={pause}
         onResume={resume}
