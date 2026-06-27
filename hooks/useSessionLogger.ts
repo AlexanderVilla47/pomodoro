@@ -10,6 +10,7 @@ interface SessionPayload {
   planned_duration: number;
   actual_duration: number;
   completed: boolean;
+  label_id?: number | null;
 }
 
 export function useSessionLogger(onLogged: () => void) {

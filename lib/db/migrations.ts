@@ -52,4 +52,18 @@ export function runMigrations(db: DatabaseSync): void {
       position INTEGER NOT NULL
     )
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS labels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL DEFAULT '#5ABFA8'
+    )
+  `);
+
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN label_id INTEGER REFERENCES labels(id) ON DELETE SET NULL`);
+  } catch {
+    // Column already exists
+  }
 }

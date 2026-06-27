@@ -68,40 +68,39 @@ export function PlaylistSwitcher({ onSelect }: PlaylistSwitcherProps) {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {playlists.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          {playlists.map((p) => (
-            <button
-              key={p.playlist_id}
-              onClick={() => handleSelect(p.playlist_id)}
-              className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                activeId === p.playlist_id
-                  ? "bg-mint text-black font-semibold"
-                  : "bg-white/10 text-white/60 hover:bg-white/20"
-              }`}
-            >
-              {p.title}
-            </button>
-          ))}
-        </div>
-      )}
-      <form onSubmit={handleAdd} className="flex gap-2">
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Pegar URL de YouTube Music..."
-          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-mint/50"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-3 py-1.5 bg-mint/20 text-mint rounded-lg text-sm hover:bg-mint/30 disabled:opacity-50"
-        >
-          {loading ? "..." : "+"}
-        </button>
-      </form>
+    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+      {/* chips + URL en una sola fila */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {playlists.map((p) => (
+          <button
+            key={p.playlist_id}
+            onClick={() => handleSelect(p.playlist_id)}
+            className={`px-2.5 py-0.5 rounded-full text-xs transition-colors whitespace-nowrap ${
+              activeId === p.playlist_id
+                ? "bg-mint text-black font-semibold"
+                : "bg-white/10 text-white/60 hover:bg-white/20"
+            }`}
+          >
+            {p.title}
+          </button>
+        ))}
+        <form onSubmit={handleAdd} className="flex gap-1 flex-1 min-w-[120px]">
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Pegar URL de YouTube Music..."
+            className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white placeholder-white/30 focus:outline-none focus:border-mint/50"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-2.5 py-1 bg-mint/20 text-mint rounded-lg text-xs hover:bg-mint/30 disabled:opacity-50 shrink-0"
+          >
+            {loading ? "…" : "+"}
+          </button>
+        </form>
+      </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );

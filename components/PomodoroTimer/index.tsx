@@ -25,12 +25,16 @@ export function PomodoroTimer() {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    gsap.from(containerRef.current, {
+    const el = containerRef.current;
+    gsap.killTweensOf(el);
+    gsap.set(el, { clearProps: "opacity,scale" });
+    const tween = gsap.from(el, {
       scale: 0.8,
       opacity: 0,
       duration: 0.6,
       ease: "elastic.out(1, 0.5)",
     });
+    return () => { tween.kill(); };
   }, []);
 
   useEffect(() => {

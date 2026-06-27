@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { transition } from "@/lib/timer/stateMachine";
 import { computeRemaining, shouldLog } from "@/lib/timer/engine";
 import { useSessionLogger } from "@/hooks/useSessionLogger";
+import { notifySessionComplete } from "@/lib/notifications";
 import type { MachineState } from "@/lib/timer/stateMachine";
 import type { Settings } from "@/lib/db/queries/settings";
 
@@ -34,10 +35,12 @@ export function TimerProvider({
   children,
   settings,
   onSessionLogged,
+  selectedLabelId,
 }: {
   children: React.ReactNode;
   settings: Settings;
   onSessionLogged?: () => void;
+  selectedLabelId?: number | null;
 }) {
   const [machine, setMachine] = useState<MachineState>({
     status: "idle",
@@ -55,6 +58,9 @@ export function TimerProvider({
   const onSessionLoggedRef = useRef(onSessionLogged);
   onSessionLoggedRef.current = onSessionLogged;
 
+  const selectedLabelIdRef = useRef(selectedLabelId);
+  selectedLabelIdRef.current = selectedLabelId;
+
   const { logSession } = useSessionLogger(() => {
     onSessionLoggedRef.current?.();
   });
@@ -69,6 +75,7 @@ export function TimerProvider({
           planned_duration: settings.work_duration,
           actual_duration: Math.round(elapsed / 1000),
           completed,
+          label_id: selectedLabelIdRef.current ?? null,
         });
       }
     },
@@ -82,11 +89,27 @@ export function TimerProvider({
       const rem = computeRemaining(endTimeRef.current, Date.now());
       setRemaining(rem);
       if (rem <= 0) {
+        notifySessionComplete(m.phase, settings.notification_sound_enabled);
         const elapsed = phaseDuration(m.phase, settings);
         doLog(m, elapsed, true);
-        endTimeRef.current = null;
-        localStorage.removeItem(LS_KEY);
-        setMachine((prev) => transition(prev, "COMPLETE"));
+
+        // COMPLETE → START: arranca la siguiente fase automáticamente
+        const afterComplete = transition(m, "COMPLETE");
+        const afterStart = transition(afterComplete, "START");
+
+        if (afterStart.status === "running") {
+          const nextDur = phaseDuration(afterStart.phase, settings);
+          endTimeRef.current = Date.now() + nextDur;
+          pausedRemainingRef.current = nextDur;
+          sessionStartRef.current = Date.now();
+          localStorage.setItem(LS_KEY, String(endTimeRef.current));
+          setRemaining(nextDur);
+        } else {
+          endTimeRef.current = null;
+          localStorage.removeItem(LS_KEY);
+        }
+
+        setMachine(afterStart);
       }
     };
     gsap.ticker.add(tick);

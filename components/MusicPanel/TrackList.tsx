@@ -14,7 +14,7 @@ export function TrackList({ tracks, currentIndex, onSelect }: TrackListProps) {
   }
 
   return (
-    <ul className="flex flex-col gap-0.5 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+    <ul className="flex flex-col gap-0.5 h-full overflow-y-auto no-scrollbar">
       {tracks.map((track, i) => (
         <li key={track.id}>
           <button
