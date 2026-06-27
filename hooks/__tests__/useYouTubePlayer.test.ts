@@ -26,7 +26,6 @@ function installYTApi(player: ReturnType<typeof makeMockPlayer>) {
   (window as unknown as Record<string, unknown>).YT = {
     Player: vi.fn((_, opts) => {
       setTimeout(() => opts.events.onReady({ target: player }), 0);
-      setTimeout(() => opts.events.onStateChange({ data: 1 }), 10);
       return player;
     }),
     PlayerState: { PLAYING: 1, PAUSED: 2, ENDED: 0 },

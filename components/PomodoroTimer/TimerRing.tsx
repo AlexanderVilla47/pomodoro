@@ -14,9 +14,10 @@ interface TimerRingProps {
   accentColor?: string;
 }
 
-export function TimerRing({ remaining, total, phase, accentColor = "var(--color-coral)" }: TimerRingProps) {
+export function TimerRing({ remaining, total, phase, accentColor }: TimerRingProps) {
   const progress = total > 0 ? remaining / total : 0;
   const offset = (1 - progress) * CIRCUMFERENCE;
+  const color = accentColor ?? (phase === "work" ? "var(--color-coral)" : "var(--color-mint)");
   const glowId = `glow-${phase}`;
 
   return (
@@ -60,7 +61,7 @@ export function TimerRing({ remaining, total, phase, accentColor = "var(--color-
         cy={SIZE / 2}
         r={RADIUS}
         fill="none"
-        stroke={accentColor}
+        stroke={color}
         strokeWidth={STROKE_WIDTH}
         strokeLinecap="round"
         strokeDasharray={CIRCUMFERENCE}
