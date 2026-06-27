@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const PRESET_COLORS = [
   "#5ABFA8",
@@ -24,9 +24,13 @@ interface Props {
 
 export function LabelSelector({ selectedId, onChange }: Props) {
   const [labels, setLabels] = useState<Label[]>([]);
+  const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(PRESET_COLORS[0]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selectedLabel = labels.find((l) => l.id === selectedId) ?? null;
 
   const fetchLabels = useCallback(() => {
     fetch("/api/labels")
@@ -39,22 +43,32 @@ export function LabelSelector({ selectedId, onChange }: Props) {
     fetchLabels();
   }, [fetchLabels]);
 
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setCreating(false);
+        setNewName("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
   const create = async () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-
     const res = await fetch("/api/labels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: trimmed, color: newColor }),
     });
-
     if (res.ok) {
       const label: Label = await res.json();
-      setLabels((prev) =>
-        [...prev, label].sort((a, b) => a.name.localeCompare(b.name))
-      );
+      setLabels((prev) => [...prev, label].sort((a, b) => a.name.localeCompare(b.name)));
       onChange(label);
+      setOpen(false);
       setCreating(false);
       setNewName("");
       setNewColor(PRESET_COLORS[0]);
@@ -69,98 +83,107 @@ export function LabelSelector({ selectedId, onChange }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs text-white/30 uppercase tracking-wider shrink-0">
-          Etiqueta
-        </span>
+    <div ref={containerRef} className="relative">
+      {/* Botón trigger */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white/70 hover:bg-white/10 transition-all"
+      >
+        {selectedLabel ? (
+          <>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: selectedLabel.color }} />
+            <span className="font-medium" style={{ color: selectedLabel.color }}>{selectedLabel.name}</span>
+          </>
+        ) : (
+          <span className="text-white/35">Etiqueta</span>
+        )}
+        <span className="text-white/25 text-[10px] ml-1">{open ? "▲" : "▼"}</span>
+      </button>
 
-        <button
-          onClick={() => onChange(null)}
-          className={`px-3 py-1 rounded-full text-xs transition-all border ${
-            selectedId === null
-              ? "bg-white/15 border-white/30 text-white"
-              : "border-white/10 text-white/30 hover:text-white/50"
-          }`}
-        >
-          Ninguna
-        </button>
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-30 min-w-[190px] rounded-xl bg-[#16161f] border border-white/10 shadow-2xl py-1 overflow-hidden">
+          {/* Sin etiqueta */}
+          <button
+            onClick={() => { onChange(null); setOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/5 ${
+              selectedId === null ? "text-white" : "text-white/45"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-white/20 shrink-0" />
+            Sin etiqueta
+            {selectedId === null && <span className="ml-auto text-white/40 text-xs">✓</span>}
+          </button>
 
-        {labels.map((label) => {
-          const active = selectedId === label.id;
-          return (
+          {labels.map((label) => (
             <button
               key={label.id}
-              onClick={() => onChange(active ? null : label)}
-              className="group relative px-3 py-1 rounded-full text-xs transition-all border"
-              style={
-                active
-                  ? { backgroundColor: label.color, borderColor: "transparent", color: "#000", fontWeight: 600 }
-                  : { borderColor: label.color + "55", color: "rgba(255,255,255,0.65)" }
-              }
+              onClick={() => { onChange(label); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/5 group"
             >
-              {label.name}
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+              <span
+                className={`flex-1 text-left ${
+                  selectedId === label.id ? "font-medium text-white" : "text-white/65"
+                }`}
+              >
+                {label.name}
+              </span>
+              {selectedId === label.id && (
+                <span className="text-white/40 text-xs">✓</span>
+              )}
               <span
                 onClick={(e) => remove(e, label.id)}
-                className="hidden group-hover:inline ml-1 opacity-50 hover:opacity-100 text-[10px]"
+                className="hidden group-hover:inline text-white/25 hover:text-white/60 text-xs ml-1"
               >
                 ×
               </span>
             </button>
-          );
-        })}
+          ))}
 
-        {!creating && (
-          <button
-            onClick={() => setCreating(true)}
-            className="px-3 py-1 rounded-full text-xs border border-dashed border-white/20 text-white/30 hover:text-white/60 hover:border-white/40 transition-all"
-          >
-            + Nueva
-          </button>
-        )}
-      </div>
-
-      {creating && (
-        <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
-          <input
-            autoFocus
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") create();
-              if (e.key === "Escape") {
-                setCreating(false);
-                setNewName("");
-              }
-            }}
-            placeholder="Nombre de etiqueta..."
-            className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder-white/25 outline-none"
-          />
-          <div className="flex gap-1 shrink-0">
-            {PRESET_COLORS.map((c) => (
+          <div className="border-t border-white/5 mt-1 pt-1">
+            {!creating ? (
               <button
-                key={c}
-                onClick={() => setNewColor(c)}
-                className={`w-4 h-4 rounded-full transition-transform ${
-                  newColor === c ? "scale-125 ring-2 ring-white/50" : "opacity-60 hover:opacity-100"
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
+                onClick={() => setCreating(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/35 hover:text-white/60 hover:bg-white/5 transition-colors"
+              >
+                + Nueva etiqueta
+              </button>
+            ) : (
+              <div className="px-3 py-2 flex flex-col gap-2">
+                <input
+                  autoFocus
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") create();
+                    if (e.key === "Escape") { setCreating(false); setNewName(""); }
+                  }}
+                  placeholder="Nombre..."
+                  className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-sm text-white placeholder-white/25 outline-none border border-white/10 focus:border-white/30 transition-colors"
+                />
+                <div className="flex items-center gap-1.5">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setNewColor(c)}
+                      className={`w-4 h-4 rounded-full transition-transform ${
+                        newColor === c ? "scale-125 ring-2 ring-white/50" : "opacity-55 hover:opacity-100"
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                  <button
+                    onClick={create}
+                    className="ml-auto text-xs text-white/55 hover:text-white px-1"
+                  >
+                    ✓
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <button
-            onClick={create}
-            className="text-xs text-white/60 hover:text-white px-2 shrink-0"
-          >
-            ✓
-          </button>
-          <button
-            onClick={() => { setCreating(false); setNewName(""); }}
-            className="text-xs text-white/30 hover:text-white/60 shrink-0"
-          >
-            ✕
-          </button>
         </div>
       )}
     </div>

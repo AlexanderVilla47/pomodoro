@@ -41,11 +41,13 @@ function AppContent() {
       <div className="h-screen overflow-hidden bg-[var(--color-bg)] text-white">
         <div className="h-full max-w-6xl mx-auto px-4 flex gap-8">
 
-          {/* Izquierda: timer + selector de etiqueta */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-6 relative">
+          {/* Izquierda: timer centrado, label selector arriba a la izquierda */}
+          <div className="flex-1 flex flex-col items-center justify-center relative">
             <Confetti trigger={showConfetti} />
+            <div className="absolute top-4 left-0">
+              <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={setSelectedLabel} />
+            </div>
             <PomodoroTimer labelColor={selectedLabel?.color} />
-            <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={setSelectedLabel} />
           </div>
 
           {/* Derecha: columna flex, MusicPanel toma el espacio restante */}
