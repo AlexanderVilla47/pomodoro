@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/pomodoro
+  IMAGE_NAME: ghcr.io/alexandervilla47/pomodoro
 
 jobs:
   # ─────────────────────────────────────────
