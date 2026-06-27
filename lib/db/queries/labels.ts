@@ -14,7 +14,7 @@ export interface LabelStats extends Label {
 export function getLabels(db: DatabaseSync): Label[] {
   return db
     .prepare(`SELECT id, name, color FROM labels ORDER BY name`)
-    .all() as Label[];
+    .all() as unknown as Label[];
 }
 
 export function createLabel(db: DatabaseSync, name: string, color: string): Label {

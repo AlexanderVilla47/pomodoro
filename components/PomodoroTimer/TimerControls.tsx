@@ -4,7 +4,7 @@ import type { TimerStatus } from "@/lib/timer/constants";
 
 interface TimerControlsProps {
   status: TimerStatus;
-  accentColor: string;
+  accentColor?: string;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -17,7 +17,7 @@ const btnBase =
 
 export function TimerControls({
   status,
-  accentColor,
+  accentColor = "var(--color-coral)",
   onStart,
   onPause,
   onResume,

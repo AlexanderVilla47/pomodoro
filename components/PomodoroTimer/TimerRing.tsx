@@ -11,10 +11,10 @@ interface TimerRingProps {
   remaining: number;
   total: number;
   phase: TimerPhase;
-  accentColor: string;
+  accentColor?: string;
 }
 
-export function TimerRing({ remaining, total, phase, accentColor }: TimerRingProps) {
+export function TimerRing({ remaining, total, phase, accentColor = "var(--color-coral)" }: TimerRingProps) {
   const progress = total > 0 ? remaining / total : 0;
   const offset = (1 - progress) * CIRCUMFERENCE;
   const glowId = `glow-${phase}`;
