@@ -39,5 +39,8 @@ Thumbs.db
 # Docker
 .dockerignore
 
+# TypeScript build info
+tsconfig.tsbuildinfo
+
 # SDD (artefactos de planeamiento, no van al repo)
 .atl/
