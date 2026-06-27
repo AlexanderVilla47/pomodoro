@@ -1,0 +1,43 @@
+# Dependencias
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Producción
+build/
+dist/
+
+# Variables de entorno (NUNCA subir al repo)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Base de datos local
+data/
+*.db
+*.sqlite
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Docker
+.dockerignore
+
+# SDD (artefactos de planeamiento, no van al repo)
+.atl/
