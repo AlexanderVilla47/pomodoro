@@ -30,7 +30,7 @@ function AppContent() {
   if (!settings) return null;
 
   return (
-    <TimerProvider settings={settings}>
+    <TimerProvider settings={settings} onSessionLogged={handleSessionComplete}>
       <div className="relative min-h-screen bg-[var(--color-bg)] text-white">
         <div className="relative mx-auto max-w-6xl px-4 py-8 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
 

@@ -33,9 +33,11 @@ function phaseDuration(phase: MachineState["phase"], settings: Settings): number
 export function TimerProvider({
   children,
   settings,
+  onSessionLogged,
 }: {
   children: React.ReactNode;
   settings: Settings;
+  onSessionLogged?: () => void;
 }) {
   const [machine, setMachine] = useState<MachineState>({
     status: "idle",
@@ -50,8 +52,12 @@ export function TimerProvider({
   const machineRef = useRef(machine);
   machineRef.current = machine;
 
-  const [statsVersion, setStatsVersion] = useState(0);
-  const { logSession } = useSessionLogger(() => setStatsVersion((v) => v + 1));
+  const onSessionLoggedRef = useRef(onSessionLogged);
+  onSessionLoggedRef.current = onSessionLogged;
+
+  const { logSession } = useSessionLogger(() => {
+    onSessionLoggedRef.current?.();
+  });
 
   const doLog = useCallback(
     (m: MachineState, elapsed: number, completed: boolean) => {
