@@ -14,7 +14,7 @@ export function SessionProgress({ sessionCount, longBreakInterval }: SessionProg
         <span
           key={i}
           className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-            i < completed ? "bg-coral" : "bg-white/20"
+            i < completed ? "bg-mint" : "bg-white/20"
           }`}
         />
       ))}

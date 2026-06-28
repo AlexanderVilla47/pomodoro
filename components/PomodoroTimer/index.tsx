@@ -28,10 +28,7 @@ export function PomodoroTimer({ labelColor }: PomodoroTimerProps) {
     : 1500000;
 
   // Color del acento: etiqueta durante trabajo, mint durante descanso
-  const accentColor =
-    phase === "work"
-      ? (labelColor ?? "var(--color-coral)")
-      : "var(--color-mint)";
+  const accentColor = labelColor ?? "var(--color-mint)";
 
   useEffect(() => {
     if (!containerRef.current) return;
