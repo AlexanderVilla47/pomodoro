@@ -17,7 +17,7 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
     setError(null);
 
@@ -70,7 +70,7 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 items-end">
         <div className={field}>
           <label htmlFor="work_duration" className={label}>
             Tiempo de enfoque (min)
