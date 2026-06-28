@@ -5,6 +5,12 @@ vi.mock("@/lib/db/queries/sessions", () => ({
   getStatsForToday: vi.fn(),
   getStatsForWeek: vi.fn(),
 }));
+vi.mock("@/lib/auth/session", () => ({
+  getSession: vi.fn().mockResolvedValue({
+    user: { id: "test-user-id", email: "test@test.com", name: "Test User" },
+    session: { id: "test-session-id" },
+  }),
+}));
 
 import { GET } from "../stats/route";
 import { getStatsForToday, getStatsForWeek } from "@/lib/db/queries/sessions";
@@ -44,21 +50,21 @@ describe("GET /api/stats", () => {
   it("sin parámetro tz llama a las queries con offset 0", async () => {
     const req = new Request("http://localhost/api/stats");
     await GET(req);
-    expect(mockToday).toHaveBeenCalledWith(expect.anything(), 0);
-    expect(mockWeek).toHaveBeenCalledWith(expect.anything(), 0);
+    expect(mockToday).toHaveBeenCalledWith(expect.anything(), "test-user-id", 0);
+    expect(mockWeek).toHaveBeenCalledWith(expect.anything(), "test-user-id", 0);
   });
 
   it("acepta parámetro tz=-180", async () => {
     const req = new Request("http://localhost/api/stats?tz=-180");
     const res = await GET(req);
     expect(res.status).toBe(200);
-    expect(mockToday).toHaveBeenCalledWith(expect.anything(), -180);
+    expect(mockToday).toHaveBeenCalledWith(expect.anything(), "test-user-id", -180);
   });
 
   it("ignora tz inválido y usa 0", async () => {
     const req = new Request("http://localhost/api/stats?tz=abc");
     const res = await GET(req);
     expect(res.status).toBe(200);
-    expect(mockToday).toHaveBeenCalledWith(expect.anything(), 0);
+    expect(mockToday).toHaveBeenCalledWith(expect.anything(), "test-user-id", 0);
   });
 });

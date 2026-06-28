@@ -24,12 +24,13 @@ type NewTrack = Omit<Track, "id" | "playlist_id">;
 
 export async function upsertPlaylist(
   sql: Sql,
+  userId: string,
   data: { playlist_id: string; title: string; thumbnail_url: string | null }
 ): Promise<Playlist> {
   const [row] = await sql<Playlist[]>`
-    INSERT INTO playlists (playlist_id, title, thumbnail_url, cached_at)
-    VALUES (${data.playlist_id}, ${data.title}, ${data.thumbnail_url}, NOW())
-    ON CONFLICT (playlist_id) DO UPDATE SET
+    INSERT INTO playlists (user_id, playlist_id, title, thumbnail_url, cached_at)
+    VALUES (${userId}, ${data.playlist_id}, ${data.title}, ${data.thumbnail_url}, NOW())
+    ON CONFLICT (user_id, playlist_id) DO UPDATE SET
       title = EXCLUDED.title,
       thumbnail_url = EXCLUDED.thumbnail_url,
       cached_at = NOW()
@@ -41,29 +42,30 @@ export async function upsertPlaylist(
   return row;
 }
 
-export async function getPlaylist(sql: Sql, playlistId: string): Promise<Playlist | null> {
+export async function getPlaylist(sql: Sql, userId: string, playlistId: string): Promise<Playlist | null> {
   const rows = await sql<Playlist[]>`
     SELECT id, playlist_id, title, thumbnail_url,
            cached_at::text AS cached_at,
            created_at::text AS created_at
-    FROM playlists WHERE playlist_id = ${playlistId}
+    FROM playlists WHERE user_id = ${userId} AND playlist_id = ${playlistId}
   `;
   return rows[0] ?? null;
 }
 
-export async function getPlaylists(sql: Sql): Promise<Playlist[]> {
+export async function getPlaylists(sql: Sql, userId: string): Promise<Playlist[]> {
   return sql<Playlist[]>`
     SELECT id, playlist_id, title, thumbnail_url,
            cached_at::text AS cached_at,
            created_at::text AS created_at
-    FROM playlists ORDER BY created_at DESC
+    FROM playlists WHERE user_id = ${userId} ORDER BY created_at DESC
   `;
 }
 
-export async function isPlaylistStale(sql: Sql, playlistId: string): Promise<boolean> {
+export async function isPlaylistStale(sql: Sql, userId: string, playlistId: string): Promise<boolean> {
   const rows = await sql`
     SELECT 1 FROM playlists
-    WHERE playlist_id = ${playlistId}
+    WHERE user_id = ${userId}
+      AND playlist_id = ${playlistId}
       AND cached_at > NOW() - interval '24 hours'
   `;
   return rows.length === 0;
@@ -87,16 +89,16 @@ export async function upsertTracks(sql: Sql, playlistId: number, tracks: NewTrac
   `;
 }
 
-export async function deletePlaylist(sql: Sql, playlistId: string): Promise<void> {
-  await sql`DELETE FROM playlists WHERE playlist_id = ${playlistId}`;
+export async function deletePlaylist(sql: Sql, userId: string, playlistId: string): Promise<void> {
+  await sql`DELETE FROM playlists WHERE playlist_id = ${playlistId} AND user_id = ${userId}`;
 }
 
-export async function updatePlaylistCachedAt(sql: Sql, playlistId: string): Promise<void> {
-  await sql`UPDATE playlists SET cached_at = NOW() WHERE playlist_id = ${playlistId}`;
+export async function updatePlaylistCachedAt(sql: Sql, userId: string, playlistId: string): Promise<void> {
+  await sql`UPDATE playlists SET cached_at = NOW() WHERE playlist_id = ${playlistId} AND user_id = ${userId}`;
 }
 
-export async function getTracksByPlaylist(sql: Sql, playlistId: string): Promise<Track[]> {
-  const playlist = await getPlaylist(sql, playlistId);
+export async function getTracksByPlaylist(sql: Sql, userId: string, playlistId: string): Promise<Track[]> {
+  const playlist = await getPlaylist(sql, userId, playlistId);
   if (!playlist) return [];
 
   return sql<Track[]>`

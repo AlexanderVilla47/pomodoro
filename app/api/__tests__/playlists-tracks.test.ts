@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/lib/db/index", () => ({ getDb: () => ({}) }));
+vi.mock("@/lib/auth/session", () => ({
+  getSession: vi.fn().mockResolvedValue({
+    user: { id: "test-user-id", email: "test@test.com", name: "Test User" },
+    session: { id: "test-session-id" },
+  }),
+}));
 vi.mock("@/lib/db/queries/playlists", () => ({
   getPlaylist: vi.fn(),
   isPlaylistStale: vi.fn(),

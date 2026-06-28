@@ -5,7 +5,8 @@ type Sql = ReturnType<typeof postgres>;
 export async function runMigrations(sql: Sql): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
       work_duration INTEGER NOT NULL DEFAULT 1500,
       short_break_duration INTEGER NOT NULL DEFAULT 300,
       long_break_duration INTEGER NOT NULL DEFAULT 900,
@@ -15,19 +16,20 @@ export async function runMigrations(sql: Sql): Promise<void> {
     )
   `;
 
-  await sql`INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`;
-
   await sql`
     CREATE TABLE IF NOT EXISTS labels (
       id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      color TEXT NOT NULL DEFAULT '#5ABFA8'
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#5ABFA8',
+      UNIQUE (user_id, name)
     )
   `;
 
   await sql`
     CREATE TABLE IF NOT EXISTS sessions (
       id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL,
       type TEXT NOT NULL CHECK (type IN ('work', 'short_break', 'long_break')),
       started_at TIMESTAMPTZ NOT NULL,
       ended_at TIMESTAMPTZ NOT NULL,
@@ -41,11 +43,13 @@ export async function runMigrations(sql: Sql): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS playlists (
       id SERIAL PRIMARY KEY,
-      playlist_id TEXT NOT NULL UNIQUE,
+      user_id TEXT NOT NULL,
+      playlist_id TEXT NOT NULL,
       title TEXT NOT NULL,
       thumbnail_url TEXT,
       cached_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, playlist_id)
     )
   `;
 

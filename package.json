@@ -12,9 +12,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "better-auth": "^1.6.22",
     "clsx": "^2.1.1",
     "gsap": "^3.12.7",
     "next": "^15.3.3",
+    "pg": "^8.22.0",
     "postgres": "^3.4.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -24,6 +27,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.5.2",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.1",
