@@ -60,11 +60,11 @@ export function useYouTubePlayer() {
 
   const loadPlayer = useCallback(
     (containerId: string, videoIds: string[]): Promise<void> => {
-      // Reuse existing player — just load new playlist
+      // Reuse existing player — switch playlist and start playing immediately
       if (playerRef.current) {
         setCurrentTime(0);
         setDuration(0);
-        playerRef.current.cuePlaylist(videoIds);
+        playerRef.current.loadPlaylist(videoIds);
         return Promise.resolve();
       }
 
@@ -107,25 +107,22 @@ export function useYouTubePlayer() {
     []
   );
 
-  const play = useCallback(async () => {
-    await readyPromiseRef.current;
-    playerRef.current?.unMute();
-    playerRef.current?.playVideo();
+  const play = useCallback(() => {
+    if (!playerRef.current) return;
+    playerRef.current.unMute();
+    playerRef.current.playVideo();
   }, []);
 
-  const pause = useCallback(async () => {
-    await readyPromiseRef.current;
+  const pause = useCallback(() => {
     playerRef.current?.pauseVideo();
   }, []);
 
-  const next = useCallback(async () => {
-    await readyPromiseRef.current;
+  const next = useCallback(() => {
     setCurrentTime(0);
     playerRef.current?.nextVideo();
   }, []);
 
-  const prev = useCallback(async () => {
-    await readyPromiseRef.current;
+  const prev = useCallback(() => {
     setCurrentTime(0);
     playerRef.current?.previousVideo();
   }, []);
