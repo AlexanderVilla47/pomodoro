@@ -17,6 +17,13 @@ import { UserBadge } from "@/components/UserBadge";
 
 type MobileTab = "timer" | "music" | "stats";
 
+function hexToRgb(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r} ${g} ${b}`;
+}
+
 function AppContent() {
   const { settings, updateSettings } = useSettings();
   const [statsVersion, setStatsVersion] = useState(0);
@@ -34,6 +41,12 @@ function AppContent() {
   useEffect(() => {
     requestNotificationPermission().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const color = selectedLabel?.color ?? "#5ABFA8";
+    document.documentElement.style.setProperty("--color-mint", color);
+    document.documentElement.style.setProperty("--color-mint-rgb", hexToRgb(color));
+  }, [selectedLabel]);
 
   if (!settings) return null;
 
