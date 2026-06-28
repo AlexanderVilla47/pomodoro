@@ -19,6 +19,7 @@ export function SpotifyPanel() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
   const [viewedId, setViewedId] = useState<string | null>(null);
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
+  const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksError, setTracksError] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [volume, setVolume] = useState(80);
@@ -46,6 +47,7 @@ export function SpotifyPanel() {
     if (!viewedId) return;
     setTracks([]);
     setTracksError(false);
+    setTracksLoading(true);
     fetch(`/api/spotify/playlists/${viewedId}`)
       .then((r) => r.json())
       .then((data: unknown) => {
@@ -55,7 +57,8 @@ export function SpotifyPanel() {
           setTracksError(true);
         }
       })
-      .catch(() => setTracksError(true));
+      .catch(() => setTracksError(true))
+      .finally(() => setTracksLoading(false));
   }, [viewedId]);
 
   useEffect(() => {
@@ -204,14 +207,34 @@ export function SpotifyPanel() {
         </div>
       )}
 
-      {!tracks.length && viewedId && !tracksError && (
-        <p className="text-xs text-white/30 text-center py-2">Cargando tracks…</p>
-      )}
+      {/* Estado de carga / vacío / error cuando no hay tracks */}
+      {!tracks.length && (
+        <>
+          {tracksLoading && (
+            <p className="text-xs text-white/30 text-center py-2">Cargando tracks…</p>
+          )}
+          {!tracksLoading && tracksError && (
+            <p className="text-xs text-red-400/70 text-center py-2">
+              Error al cargar los tracks. Probá reconectar tu cuenta.
+            </p>
+          )}
+          {!tracksLoading && !tracksError && viewedId && (
+            <p className="text-xs text-white/30 text-center py-2">Esta playlist está vacía.</p>
+          )}
 
-      {tracksError && (
-        <p className="text-xs text-red-400/70 text-center py-2">
-          Error al cargar los tracks. Probá reconectar tu cuenta.
-        </p>
+          {/* A continuación — cola del SDK cuando no hay lista de playlist */}
+          {!tracksLoading && player.nextTracks.length > 0 && (
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-0.5">
+              <p className="text-[10px] text-white/25 px-2 pb-1 uppercase tracking-wider">A continuación</p>
+              {player.nextTracks.map((t) => (
+                <div key={t.uri} className="w-full text-left px-2 py-1.5 rounded-lg text-xs text-white/50">
+                  <span className="font-medium truncate block">{t.name}</span>
+                  <span className="text-white/25 truncate block">{t.artists[0]?.name ?? ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

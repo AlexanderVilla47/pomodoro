@@ -171,7 +171,7 @@ export async function getPlaylistTracks(
     const res: Response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) break;
+    if (!res.ok) throw new Error(`Spotify tracks fetch failed: ${res.status}`);
     const data = await res.json();
     for (const item of data.items) {
       const t = item.track;
