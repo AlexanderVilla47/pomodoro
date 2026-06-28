@@ -108,7 +108,7 @@ export function TimerProvider({
         endTimeRef.current = Date.now() + nextDur;
         pausedRemainingRef.current = nextDur;
         sessionStartRef.current = Date.now();
-        localStorage.setItem(LS_KEY, String(endTimeRef.current));
+        localStorage.setItem(LS_KEY, JSON.stringify({ endTime: endTimeRef.current, phase: afterStart.phase, sessionCount: afterStart.sessionCount }));
         setRemaining(nextDur);
       } else {
         endTimeRef.current = null;
@@ -178,11 +178,21 @@ export function TimerProvider({
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY);
     if (saved) {
-      const endTime = Number(saved);
+      let endTime: number;
+      let savedPhase: MachineState["phase"] = "work";
+      let savedSessionCount = 0;
+      try {
+        const parsed = JSON.parse(saved);
+        endTime = parsed.endTime;
+        savedPhase = parsed.phase ?? "work";
+        savedSessionCount = parsed.sessionCount ?? 0;
+      } catch {
+        endTime = Number(saved);
+      }
       if (endTime > Date.now()) {
         endTimeRef.current = endTime;
         setRemaining(computeRemaining(endTime, Date.now()));
-        setMachine((prev) => ({ ...prev, status: "running" }));
+        setMachine({ status: "running", phase: savedPhase, sessionCount: savedSessionCount });
         return;
       } else {
         localStorage.removeItem(LS_KEY);
@@ -210,7 +220,7 @@ export function TimerProvider({
         endTimeRef.current = Date.now() + dur;
         pausedRemainingRef.current = dur;
         sessionStartRef.current = Date.now();
-        localStorage.setItem(LS_KEY, String(endTimeRef.current));
+        localStorage.setItem(LS_KEY, JSON.stringify({ endTime: endTimeRef.current, phase: next.phase, sessionCount: next.sessionCount }));
         localStorage.removeItem(LS_PAUSED_KEY);
       }
       return next;
@@ -236,9 +246,10 @@ export function TimerProvider({
     setMachine((prev) => {
       if (prev.status !== "paused") return prev;
       endTimeRef.current = Date.now() + pausedRemainingRef.current;
-      localStorage.setItem(LS_KEY, String(endTimeRef.current));
+      const next = transition(prev, "RESUME");
+      localStorage.setItem(LS_KEY, JSON.stringify({ endTime: endTimeRef.current, phase: next.phase, sessionCount: next.sessionCount }));
       localStorage.removeItem(LS_PAUSED_KEY);
-      return transition(prev, "RESUME");
+      return next;
     });
   }, []);
 
