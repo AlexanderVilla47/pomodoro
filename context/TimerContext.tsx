@@ -24,6 +24,7 @@ interface TimerContextValue {
 const TimerContext = createContext<TimerContextValue | null>(null);
 
 const LS_KEY = "pomodoro_endTime";
+const LS_PAUSED_KEY = "pomodoro_paused_state";
 
 function phaseDuration(phase: MachineState["phase"], settings: Settings): number {
   if (phase === "work") return settings.work_duration * 1000;
@@ -182,8 +183,21 @@ export function TimerProvider({
         endTimeRef.current = endTime;
         setRemaining(computeRemaining(endTime, Date.now()));
         setMachine((prev) => ({ ...prev, status: "running" }));
+        return;
       } else {
         localStorage.removeItem(LS_KEY);
+      }
+    }
+
+    const savedPaused = localStorage.getItem(LS_PAUSED_KEY);
+    if (savedPaused) {
+      try {
+        const { phase, sessionCount, remaining: rem } = JSON.parse(savedPaused);
+        pausedRemainingRef.current = rem;
+        setRemaining(rem);
+        setMachine({ status: "paused", phase, sessionCount });
+      } catch {
+        localStorage.removeItem(LS_PAUSED_KEY);
       }
     }
   }, []);
@@ -197,6 +211,7 @@ export function TimerProvider({
         pausedRemainingRef.current = dur;
         sessionStartRef.current = Date.now();
         localStorage.setItem(LS_KEY, String(endTimeRef.current));
+        localStorage.removeItem(LS_PAUSED_KEY);
       }
       return next;
     });
@@ -208,7 +223,12 @@ export function TimerProvider({
       pausedRemainingRef.current = remaining;
       endTimeRef.current = null;
       localStorage.removeItem(LS_KEY);
-      return transition(prev, "PAUSE");
+      const next = transition(prev, "PAUSE");
+      localStorage.setItem(
+        LS_PAUSED_KEY,
+        JSON.stringify({ phase: next.phase, sessionCount: next.sessionCount, remaining })
+      );
+      return next;
     });
   }, [remaining]);
 
@@ -217,6 +237,7 @@ export function TimerProvider({
       if (prev.status !== "paused") return prev;
       endTimeRef.current = Date.now() + pausedRemainingRef.current;
       localStorage.setItem(LS_KEY, String(endTimeRef.current));
+      localStorage.removeItem(LS_PAUSED_KEY);
       return transition(prev, "RESUME");
     });
   }, []);
@@ -231,6 +252,7 @@ export function TimerProvider({
       doLog(prev, elapsed, false);
       endTimeRef.current = null;
       localStorage.removeItem(LS_KEY);
+      localStorage.removeItem(LS_PAUSED_KEY);
       return transition(prev, "STOP");
     });
   }, [settings, doLog]);
@@ -239,6 +261,7 @@ export function TimerProvider({
     setMachine((prev) => {
       endTimeRef.current = null;
       localStorage.removeItem(LS_KEY);
+      localStorage.removeItem(LS_PAUSED_KEY);
       return transition(prev, "SKIP");
     });
   }, []);
