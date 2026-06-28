@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 
-export function UserBadge() {
+export function UserBadge({ className }: { className?: string }) {
   const { data: session } = authClient.useSession();
   const router = useRouter();
 
@@ -27,7 +27,7 @@ export function UserBadge() {
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 ${className ?? ""}`}>
       {image ? (
         <Image
           src={image}

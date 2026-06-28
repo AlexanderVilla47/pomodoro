@@ -55,10 +55,6 @@ function AppContent() {
           <div className="w-[440px] shrink-0 flex flex-col gap-3 py-6 overflow-hidden">
 
             <div className="shrink-0">
-              <UserBadge />
-            </div>
-
-            <div className="shrink-0">
               <Dashboard refreshTrigger={statsVersion} />
             </div>
 
@@ -66,12 +62,14 @@ function AppContent() {
               <MusicPanel />
             </div>
 
-            <div className="shrink-0 relative">
+            <div className="shrink-0 flex gap-2 relative">
+              <UserBadge className="flex-1 min-w-0" />
+
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
-                className="w-full py-2 px-4 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                className="flex-1 py-2 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
               >
-                {settingsOpen ? "✕ Cerrar configuración" : "⚙ Configuración"}
+                {settingsOpen ? "✕ Cerrar" : "⚙ Configuración"}
               </button>
 
               {settingsOpen && (
