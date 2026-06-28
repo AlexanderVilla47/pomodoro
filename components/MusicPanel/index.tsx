@@ -86,9 +86,8 @@ export function MusicPanel() {
         setPlayerPlaylistId(viewedPlaylistId);
       }
       player.playAt(index);
-      player.play();
     },
-    [viewedPlaylistId, playerPlaylistId, viewedTracks, player.loadPlayer, player.playAt, player.play]
+    [viewedPlaylistId, playerPlaylistId, viewedTracks, player.loadPlayer, player.playAt]
   );
 
   const handleVolumeChange = useCallback(

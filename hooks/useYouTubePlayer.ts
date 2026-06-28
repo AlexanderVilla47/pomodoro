@@ -60,11 +60,11 @@ export function useYouTubePlayer() {
 
   const loadPlayer = useCallback(
     (containerId: string, videoIds: string[]): Promise<void> => {
-      // Reuse existing player — switch playlist and start playing immediately
+      // Reuse existing player — cue the new playlist without disrupting the player state
       if (playerRef.current) {
         setCurrentTime(0);
         setDuration(0);
-        playerRef.current.loadPlaylist(videoIds);
+        playerRef.current.cuePlaylist(videoIds);
         return Promise.resolve();
       }
 
@@ -129,7 +129,9 @@ export function useYouTubePlayer() {
 
   const playAt = useCallback((index: number) => {
     setCurrentTime(0);
-    playerRef.current?.playVideoAt(index);
+    if (!playerRef.current) return;
+    playerRef.current.playVideoAt(index);
+    playerRef.current.playVideo();
   }, []);
 
   const setVolume = useCallback((v: number) => {
