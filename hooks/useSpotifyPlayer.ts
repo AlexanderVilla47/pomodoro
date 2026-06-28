@@ -30,12 +30,19 @@ interface SpotifySDKPlayer {
   getCurrentState: () => Promise<SpotifyPlayerState | null>;
 }
 
+interface SpotifySDKTrack {
+  name: string;
+  uri: string;
+  artists: { name: string }[];
+}
+
 interface SpotifyPlayerState {
   paused: boolean;
   position: number;
   duration: number;
   track_window: {
-    current_track: { name: string; uri: string; artists: { name: string }[] };
+    current_track: SpotifySDKTrack;
+    next_tracks: SpotifySDKTrack[];
   };
 }
 
@@ -51,6 +58,7 @@ export function useSpotifyPlayer() {
   const [currentTrackUri, setCurrentTrackUri] = useState<string | null>(null);
   const [currentTrackName, setCurrentTrackName] = useState<string | null>(null);
   const [currentArtistName, setCurrentArtistName] = useState<string | null>(null);
+  const [nextTracks, setNextTracks] = useState<SpotifySDKTrack[]>([]);
   const urisRef = useRef<string[]>([]);
   const currentIndexRef = useRef(0);
 
@@ -104,6 +112,7 @@ export function useSpotifyPlayer() {
         setCurrentTrackUri(track.uri);
         setCurrentTrackName(track.name);
         setCurrentArtistName(track.artists[0]?.name ?? null);
+        setNextTracks(s.track_window.next_tracks ?? []);
         const idx = urisRef.current.indexOf(track.uri);
         if (idx >= 0) currentIndexRef.current = idx;
       });
@@ -210,6 +219,7 @@ export function useSpotifyPlayer() {
     currentTrackUri,
     currentTrackName,
     currentArtistName,
+    nextTracks,
     initSDK,
     loadAndPlay,
     play,
