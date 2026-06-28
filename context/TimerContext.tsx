@@ -83,37 +83,54 @@ export function TimerProvider({
   );
 
   useEffect(() => {
+    const handleSessionEnd = (m: MachineState) => {
+      notifySessionComplete(m.phase, settings.notification_sound_enabled);
+      const elapsed = phaseDuration(m.phase, settings);
+      doLog(m, elapsed, true);
+
+      const afterComplete = transition(m, "COMPLETE");
+      const afterStart = transition(afterComplete, "START");
+
+      if (afterStart.status === "running") {
+        const nextDur = phaseDuration(afterStart.phase, settings);
+        endTimeRef.current = Date.now() + nextDur;
+        pausedRemainingRef.current = nextDur;
+        sessionStartRef.current = Date.now();
+        localStorage.setItem(LS_KEY, String(endTimeRef.current));
+        setRemaining(nextDur);
+      } else {
+        endTimeRef.current = null;
+        localStorage.removeItem(LS_KEY);
+      }
+
+      setMachine(afterStart);
+    };
+
     const tick = () => {
       const m = machineRef.current;
       if (m.status !== "running" || endTimeRef.current === null) return;
       const rem = computeRemaining(endTimeRef.current, Date.now());
       setRemaining(rem);
-      if (rem <= 0) {
-        notifySessionComplete(m.phase, settings.notification_sound_enabled);
-        const elapsed = phaseDuration(m.phase, settings);
-        doLog(m, elapsed, true);
-
-        // COMPLETE → START: arranca la siguiente fase automáticamente
-        const afterComplete = transition(m, "COMPLETE");
-        const afterStart = transition(afterComplete, "START");
-
-        if (afterStart.status === "running") {
-          const nextDur = phaseDuration(afterStart.phase, settings);
-          endTimeRef.current = Date.now() + nextDur;
-          pausedRemainingRef.current = nextDur;
-          sessionStartRef.current = Date.now();
-          localStorage.setItem(LS_KEY, String(endTimeRef.current));
-          setRemaining(nextDur);
-        } else {
-          endTimeRef.current = null;
-          localStorage.removeItem(LS_KEY);
-        }
-
-        setMachine(afterStart);
-      }
+      if (rem <= 0) handleSessionEnd(m);
     };
+
+    // GSAP lag smoothing masks expired time in background tabs —
+    // check wall clock directly when the tab becomes visible again
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const m = machineRef.current;
+      if (m.status !== "running" || endTimeRef.current === null) return;
+      const rem = computeRemaining(endTimeRef.current, Date.now());
+      if (rem <= 0) handleSessionEnd(m);
+      else setRemaining(rem);
+    };
+
     gsap.ticker.add(tick);
-    return () => gsap.ticker.remove(tick);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      gsap.ticker.remove(tick);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [settings, doLog]);
 
   useEffect(() => {
