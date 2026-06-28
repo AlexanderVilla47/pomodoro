@@ -95,40 +95,34 @@ function AppContent() {
             <UserBadge />
           </div>
 
-          {/* Content */}
+          {/* Content — always mounted to keep YouTube player alive across tab switches */}
           <div className="flex-1 min-h-0 overflow-hidden relative">
             <Confetti trigger={showConfetti} />
 
-            {mobileTab === "timer" && (
-              <div className="h-full flex flex-col items-center justify-center px-6 gap-0">
-                <PomodoroTimer labelColor={selectedLabel?.color} />
-              </div>
-            )}
+            <div className={`h-full flex flex-col items-center justify-center px-6 ${mobileTab === "timer" ? "" : "hidden"}`}>
+              <PomodoroTimer labelColor={selectedLabel?.color} />
+            </div>
 
-            {mobileTab === "music" && (
-              <div className="h-full p-3">
-                <MusicPanel />
-              </div>
-            )}
+            <div className={`h-full p-3 ${mobileTab === "music" ? "" : "hidden"}`}>
+              <MusicPanel />
+            </div>
 
-            {mobileTab === "stats" && (
-              <div className="h-full overflow-y-auto p-4 flex flex-col gap-3">
-                <Dashboard refreshTrigger={statsVersion} />
-                <div className="relative">
-                  <button
-                    onClick={() => setSettingsOpen((o) => !o)}
-                    className="w-full py-2 px-4 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                  >
-                    {settingsOpen ? "✕ Cerrar configuración" : "⚙ Configuración"}
-                  </button>
-                  {settingsOpen && (
-                    <div className="mt-2">
-                      <SettingsPanel settings={settings} onSave={settingsPatch} />
-                    </div>
-                  )}
-                </div>
+            <div className={`h-full overflow-y-auto p-4 flex flex-col gap-3 ${mobileTab === "stats" ? "" : "hidden"}`}>
+              <Dashboard refreshTrigger={statsVersion} />
+              <div className="relative">
+                <button
+                  onClick={() => setSettingsOpen((o) => !o)}
+                  className="w-full py-2 px-4 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  {settingsOpen ? "✕ Cerrar configuración" : "⚙ Configuración"}
+                </button>
+                {settingsOpen && (
+                  <div className="mt-2">
+                    <SettingsPanel settings={settings} onSave={settingsPatch} />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Tab bar */}
