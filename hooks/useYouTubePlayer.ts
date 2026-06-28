@@ -30,7 +30,7 @@ interface YTPlayer {
   setVolume: (v: number) => void;
   unMute: () => void;
   loadPlaylist: (ids: string[]) => void;
-  cuePlaylist: (ids: string[]) => void;
+  cuePlaylist: (ids: string[], index?: number, startSeconds?: number) => void;
   getCurrentTime: () => number;
   getDuration: () => number;
   getPlaylistIndex: () => number;
@@ -44,6 +44,8 @@ export function useYouTubePlayer() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const playerRef = useRef<YTPlayer | null>(null);
+  const videoIdsRef = useRef<string[]>([]);
+  const playerStateRef = useRef(-1);
   const readyPromiseRef = useRef<Promise<void>>(Promise.resolve());
 
   // Poll currentTime while playing
@@ -51,9 +53,12 @@ export function useYouTubePlayer() {
     if (playerState !== 1) return;
     const id = setInterval(() => {
       if (!playerRef.current) return;
+      if (typeof playerRef.current.getCurrentTime !== "function") return;
       setCurrentTime(playerRef.current.getCurrentTime());
-      const d = playerRef.current.getDuration();
-      if (d > 0) setDuration(d);
+      if (typeof playerRef.current.getDuration === "function") {
+        const d = playerRef.current.getDuration();
+        if (d > 0) setDuration(d);
+      }
     }, 500);
     return () => clearInterval(id);
   }, [playerState]);
@@ -64,6 +69,7 @@ export function useYouTubePlayer() {
       if (playerRef.current) {
         setCurrentTime(0);
         setDuration(0);
+        videoIdsRef.current = videoIds;
         playerRef.current.cuePlaylist(videoIds);
         return Promise.resolve();
       }
@@ -78,13 +84,16 @@ export function useYouTubePlayer() {
           playerVars: { autoplay: 0, controls: 0 },
           events: {
             onReady: (e) => {
+              videoIdsRef.current = videoIds;
               e.target.cuePlaylist(videoIds);
               setIsReady(true);
               resolve();
             },
             onStateChange: (e) => {
               setPlayerState(e.data);
-              if (e.data === 1 && playerRef.current) {
+              playerStateRef.current = e.data;
+              // Guard: during iframe transitions getDuration is not available
+              if (e.data === 1 && playerRef.current && typeof playerRef.current.getDuration === "function") {
                 const d = playerRef.current.getDuration();
                 if (d > 0) setDuration(d);
               }
@@ -130,8 +139,15 @@ export function useYouTubePlayer() {
   const playAt = useCallback((index: number) => {
     setCurrentTime(0);
     if (!playerRef.current) return;
-    playerRef.current.playVideoAt(index);
-    playerRef.current.playVideo();
+    const state = playerStateRef.current;
+    if (state === 1 || state === 2) {
+      // Player already active — safe to jump directly
+      playerRef.current.playVideoAt(index);
+    } else {
+      // Unstarted/cued — cuePlaylist with index avoids iframe URL navigation
+      playerRef.current.cuePlaylist(videoIdsRef.current, index);
+      playerRef.current.playVideo();
+    }
   }, []);
 
   const setVolume = useCallback((v: number) => {
@@ -144,7 +160,8 @@ export function useYouTubePlayer() {
   }, []);
 
   const getPlaylistIndex = useCallback(() => {
-    return playerRef.current?.getPlaylistIndex() ?? 0;
+    if (!playerRef.current || typeof playerRef.current.getPlaylistIndex !== "function") return 0;
+    return playerRef.current.getPlaylistIndex();
   }, []);
 
   return {
