@@ -73,11 +73,13 @@ export function Dashboard({ refreshTrigger }: DashboardProps) {
             label="Hoy"
             count={stats?.today.count ?? 0}
             totalSeconds={stats?.today.total_seconds ?? 0}
+            isLoading={stats === null}
           />
           <StatsCard
             label="Esta semana"
             count={stats?.week.count ?? 0}
             totalSeconds={stats?.week.total_seconds ?? 0}
+            isLoading={stats === null}
           />
         </div>
       </div>

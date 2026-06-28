@@ -7,6 +7,7 @@ interface StatsCardProps {
   label: string;
   count: number;
   totalSeconds: number;
+  isLoading?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -16,7 +17,7 @@ function formatDuration(seconds: number): string {
   return `${m}m`;
 }
 
-export function StatsCard({ label, count, totalSeconds }: StatsCardProps) {
+export function StatsCard({ label, count, totalSeconds, isLoading }: StatsCardProps) {
   const countRef = useRef<HTMLSpanElement>(null);
   const prevCount = useRef(count);
 
@@ -33,6 +34,16 @@ export function StatsCard({ label, count, totalSeconds }: StatsCardProps) {
     });
     prevCount.current = count;
   }, [count]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10 animate-pulse">
+        <span className="text-xs uppercase tracking-wider text-white/40">{label}</span>
+        <div className="h-9 w-16 rounded bg-white/10 mt-1" />
+        <div className="h-4 w-10 rounded bg-white/10 mt-1" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10">

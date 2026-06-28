@@ -17,5 +17,9 @@ export async function GET(req: Request) {
     getStatsForWeek(db, session.user.id, offset),
   ]);
 
-  return Response.json({ today, week });
+  return Response.json({ today, week }, {
+    headers: {
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=300",
+    },
+  });
 }
