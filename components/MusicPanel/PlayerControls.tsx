@@ -34,7 +34,7 @@ const IconNext = () => (
 
 const IconPlay = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-    <path d="M8 5v14l11-7z" />
+    <path d="M7 4.5v15l13-7.5z" />
   </svg>
 );
 
@@ -76,7 +76,7 @@ export function PlayerControls({
   onSeek,
 }: PlayerControlsProps) {
   const btn =
-    "p-2 rounded-full transition-all disabled:opacity-30 hover:bg-white/10 active:scale-95 text-white/70 hover:text-white";
+    "inline-flex items-center justify-center p-2 rounded-full transition-all disabled:opacity-30 hover:bg-white/10 active:scale-95 text-white/70 hover:text-white";
 
   return (
     <div className="flex flex-col gap-3">
