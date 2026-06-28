@@ -1,8 +1,10 @@
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
 
-const url = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
-const isSupabase = url?.includes("supabase");
+const rawUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
+const isSupabase = rawUrl?.includes("supabase");
+// Strip sslmode from connection string so our ssl config takes precedence over it
+const url = rawUrl?.replace(/([?&])sslmode=[^&]*/g, "$1").replace(/[?&]+$/, "");
 
 export const auth = betterAuth({
   database: new Pool({
