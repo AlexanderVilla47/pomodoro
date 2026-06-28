@@ -19,6 +19,7 @@ export function SpotifyPanel() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
   const [viewedId, setViewedId] = useState<string | null>(null);
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
+  const [tracksError, setTracksError] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [volume, setVolume] = useState(80);
   const onViewRef = useRef(setViewedId);
@@ -44,10 +45,17 @@ export function SpotifyPanel() {
   useEffect(() => {
     if (!viewedId) return;
     setTracks([]);
+    setTracksError(false);
     fetch(`/api/spotify/playlists/${viewedId}`)
       .then((r) => r.json())
-      .then((data: SpotifyTrack[]) => setTracks(data))
-      .catch(console.error);
+      .then((data: unknown) => {
+        if (Array.isArray(data)) {
+          setTracks(data as SpotifyTrack[]);
+        } else {
+          setTracksError(true);
+        }
+      })
+      .catch(() => setTracksError(true));
   }, [viewedId]);
 
   useEffect(() => {
@@ -136,7 +144,7 @@ export function SpotifyPanel() {
         <p className="shrink-0 text-xs text-white/40 text-center py-1">{msg}</p>
       )}
 
-      {tracks.length > 0 && !msg && (
+      {tracks.length > 0 && (
         <>
           <div className="shrink-0">
             <PlayerControls
@@ -173,8 +181,14 @@ export function SpotifyPanel() {
         </>
       )}
 
-      {!tracks.length && viewedId && !msg && (
+      {!tracks.length && viewedId && !tracksError && (
         <p className="text-xs text-white/30 text-center py-2">Cargando tracks…</p>
+      )}
+
+      {tracksError && (
+        <p className="text-xs text-red-400/70 text-center py-2">
+          Error al cargar los tracks. Probá reconectar tu cuenta.
+        </p>
       )}
     </div>
   );
