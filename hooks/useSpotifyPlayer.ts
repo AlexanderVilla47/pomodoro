@@ -49,6 +49,8 @@ export function useSpotifyPlayer() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentTrackUri, setCurrentTrackUri] = useState<string | null>(null);
+  const [currentTrackName, setCurrentTrackName] = useState<string | null>(null);
+  const [currentArtistName, setCurrentArtistName] = useState<string | null>(null);
   const urisRef = useRef<string[]>([]);
   const currentIndexRef = useRef(0);
 
@@ -98,8 +100,11 @@ export function useSpotifyPlayer() {
         setIsPlaying(!s.paused);
         setCurrentTime(s.position / 1000);
         setDuration(s.duration / 1000);
-        setCurrentTrackUri(s.track_window.current_track.uri);
-        const idx = urisRef.current.indexOf(s.track_window.current_track.uri);
+        const track = s.track_window.current_track;
+        setCurrentTrackUri(track.uri);
+        setCurrentTrackName(track.name);
+        setCurrentArtistName(track.artists[0]?.name ?? null);
+        const idx = urisRef.current.indexOf(track.uri);
         if (idx >= 0) currentIndexRef.current = idx;
       });
 
@@ -203,6 +208,8 @@ export function useSpotifyPlayer() {
     currentTime,
     duration,
     currentTrackUri,
+    currentTrackName,
+    currentArtistName,
     initSDK,
     loadAndPlay,
     play,

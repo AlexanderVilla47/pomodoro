@@ -140,6 +140,7 @@ export function SpotifyPanel() {
         </button>
       </div>
 
+      {/* SDK status / error */}
       {msg && (
         <div className="shrink-0 text-center py-1">
           <p className="text-xs text-white/40">{msg}</p>
@@ -154,41 +155,53 @@ export function SpotifyPanel() {
         </div>
       )}
 
-      {tracks.length > 0 && (
-        <>
-          <div className="shrink-0">
-            <PlayerControls
-              isReady={player.isReady}
-              isPlaying={player.isPlaying}
-              volume={volume}
-              currentTime={player.currentTime}
-              duration={player.duration}
-              onPlay={() => player.play()}
-              onPause={() => player.pause()}
-              onNext={() => player.next()}
-              onPrev={() => player.prev()}
-              onVolumeChange={handleVolumeChange}
-              onSeek={(s) => player.seekTo(s)}
-            />
-          </div>
+      {/* Now Playing — visible whenever algo suena, aunque no se haya iniciado desde acá */}
+      {player.isReady && (
+        <div className="shrink-0">
+          {player.currentTrackName ? (
+            <div className="mb-1 px-1">
+              <p className="text-xs font-medium text-white truncate">{player.currentTrackName}</p>
+              <p className="text-[10px] text-white/40 truncate">{player.currentArtistName}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-white/30 text-center mb-1">
+              Conectado · seleccioná &ldquo;Pomodoro&rdquo; en tu app de Spotify
+            </p>
+          )}
+          <PlayerControls
+            isReady={player.isReady}
+            isPlaying={player.isPlaying}
+            volume={volume}
+            currentTime={player.currentTime}
+            duration={player.duration}
+            onPlay={() => player.play()}
+            onPause={() => player.pause()}
+            onNext={() => player.next()}
+            onPrev={() => player.prev()}
+            onVolumeChange={handleVolumeChange}
+            onSeek={(s) => player.seekTo(s)}
+          />
+        </div>
+      )}
 
-          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-0.5">
-            {tracks.map((t, i) => (
-              <button
-                key={t.uri}
-                onClick={() => handleTrackSelect(i)}
-                className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
-                  i === currentIndex && player.isPlaying
-                    ? "bg-[#1DB954]/20 text-[#1DB954]"
-                    : "text-white/60 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <span className="font-medium truncate block">{t.name}</span>
-                <span className="text-white/30 truncate block">{t.artistName}</span>
-              </button>
-            ))}
-          </div>
-        </>
+      {/* Track list de la playlist seleccionada */}
+      {tracks.length > 0 && (
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-0.5">
+          {tracks.map((t, i) => (
+            <button
+              key={t.uri}
+              onClick={() => handleTrackSelect(i)}
+              className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                t.uri === player.currentTrackUri
+                  ? "bg-[#1DB954]/20 text-[#1DB954]"
+                  : "text-white/60 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <span className="font-medium truncate block">{t.name}</span>
+              <span className="text-white/30 truncate block">{t.artistName}</span>
+            </button>
+          ))}
+        </div>
       )}
 
       {!tracks.length && viewedId && !tracksError && (
