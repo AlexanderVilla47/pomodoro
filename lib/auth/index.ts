@@ -9,9 +9,6 @@ export const auth = betterAuth({
     connectionString: url,
     ssl: isSupabase ? { rejectUnauthorized: false } : false,
   }),
-  user: {
-    tableName: "users",
-  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
