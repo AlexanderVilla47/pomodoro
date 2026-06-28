@@ -56,15 +56,9 @@ export function MusicPanel() {
         if (!res.ok) return;
         const tracks: Track[] = await res.json();
         setViewedTracks(tracks);
-
-        // Solo cargar el player si no hay nada reproduciéndose aún
-        setPlayerPlaylistId((current) => {
-          if (!current) {
-            player.loadPlayer("yt-player", tracks.map((t) => t.video_id));
-            return playlistId;
-          }
-          return current;
-        });
+        setCurrentIndex(0);
+        player.loadPlayer("yt-player", tracks.map((t) => t.video_id));
+        setPlayerPlaylistId(playlistId);
       } catch (err) {
         console.error(err);
       }
