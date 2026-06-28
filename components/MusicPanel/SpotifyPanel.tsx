@@ -153,16 +153,6 @@ export function SpotifyPanel() {
         </button>
       </div>
 
-      {/* Playlists error */}
-      {playlistsError && (
-        <div className="shrink-0 text-center py-1">
-          <p className="text-xs text-white/40">No se pudieron cargar las playlists.</p>
-          <button onClick={loadPlaylists} className="mt-1 text-xs text-mint hover:underline">
-            Reintentar
-          </button>
-        </div>
-      )}
-
       {/* SDK status / error */}
       {msg && (
         <div className="shrink-0 text-center py-1">
