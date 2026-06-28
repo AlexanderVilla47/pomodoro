@@ -7,8 +7,10 @@ declare global {
 
 export function getDb(): ReturnType<typeof postgres> {
   if (!globalThis.__sql) {
+    const isSupabase = process.env.DATABASE_URL?.includes("supabase");
     globalThis.__sql = postgres(process.env.DATABASE_URL!, {
-      ssl: process.env.DATABASE_URL?.includes(".supabase.co") ? "require" : false,
+      ssl: isSupabase ? "require" : false,
+      prepare: false,
     });
   }
   return globalThis.__sql;
