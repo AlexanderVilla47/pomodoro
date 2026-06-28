@@ -17,6 +17,7 @@ export function SpotifyPanel() {
 
   const [connected, setConnected] = useState<boolean | null>(null);
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [playlistsError, setPlaylistsError] = useState(false);
   const [viewedId, setViewedId] = useState<string | null>(null);
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
@@ -25,18 +26,27 @@ export function SpotifyPanel() {
   const [volume, setVolume] = useState(80);
   const onViewRef = useRef(setViewedId);
 
-  useEffect(() => {
+  const loadPlaylists = useCallback(() => {
+    setPlaylistsError(false);
     fetch("/api/spotify/playlists")
       .then((r) => r.json())
       .then((data) => {
         setConnected(data.connected);
-        if (data.connected && data.playlists) {
-          setPlaylists(data.playlists);
-          if (data.playlists[0]) onViewRef.current(data.playlists[0].id);
+        if (data.connected) {
+          if (data.error) {
+            setPlaylistsError(true);
+          } else if (data.playlists?.length) {
+            setPlaylists(data.playlists);
+            onViewRef.current(data.playlists[0].id);
+          }
         }
       })
       .catch(() => setConnected(false));
   }, []);
+
+  useEffect(() => {
+    loadPlaylists();
+  }, [loadPlaylists]);
 
   // Init SDK once we know user is connected
   useEffect(() => {
@@ -142,6 +152,16 @@ export function SpotifyPanel() {
           Desconectar
         </button>
       </div>
+
+      {/* Playlists error */}
+      {playlistsError && (
+        <div className="shrink-0 text-center py-1">
+          <p className="text-xs text-white/40">No se pudieron cargar las playlists.</p>
+          <button onClick={loadPlaylists} className="mt-1 text-xs text-mint hover:underline">
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* SDK status / error */}
       {msg && (
