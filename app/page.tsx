@@ -12,6 +12,7 @@ import type { Label } from "@/components/LabelSelector";
 import { useSettings } from "@/hooks/useSettings";
 import { requestNotificationPermission } from "@/lib/notifications";
 import type { Settings } from "@/lib/db/queries/settings";
+import { UserBadge } from "@/components/UserBadge";
 
 function AppContent() {
   const { settings, updateSettings } = useSettings();
@@ -52,6 +53,10 @@ function AppContent() {
 
           {/* Derecha: columna flex, MusicPanel toma el espacio restante */}
           <div className="w-[440px] shrink-0 flex flex-col gap-3 py-6 overflow-hidden">
+
+            <div className="shrink-0">
+              <UserBadge />
+            </div>
 
             <div className="shrink-0">
               <Dashboard refreshTrigger={statsVersion} />
