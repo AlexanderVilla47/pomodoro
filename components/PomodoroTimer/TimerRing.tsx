@@ -28,6 +28,7 @@ export function TimerRing({ remaining, total, phase, accentColor }: TimerRingPro
       overflow="visible"
       role="img"
       aria-label="Timer progress ring"
+      style={{ maxWidth: "100%", height: "auto" }}
     >
       <defs>
         <filter id={glowId} x="-30%" y="-30%" width="160%" height="160%">
