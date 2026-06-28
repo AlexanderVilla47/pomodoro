@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth/client";
 
-export function UserBadge({ className }: { className?: string }) {
+export function UserBadge({ className, compact }: { className?: string; compact?: boolean }) {
   const { data: session } = authClient.useSession();
   const router = useRouter();
 
@@ -24,6 +24,22 @@ export function UserBadge({ className }: { className?: string }) {
     await authClient.signOut();
     router.push("/login");
     router.refresh();
+  }
+
+  if (compact) {
+    return (
+      <button
+        onClick={handleSignOut}
+        title="Cerrar sesión"
+        className={`w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden hover:ring-2 hover:ring-white/20 transition-all ${className ?? ""}`}
+      >
+        {image ? (
+          <Image src={image} alt={name ?? email ?? ""} width={32} height={32} className="object-cover" />
+        ) : (
+          <span className="text-xs font-medium text-white/70">{initials}</span>
+        )}
+      </button>
+    );
   }
 
   return (

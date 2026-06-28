@@ -145,7 +145,7 @@ function AppContent() {
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
                 title="Configuración"
-                className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <circle cx="12" cy="12" r="3" />
@@ -158,7 +158,7 @@ function AppContent() {
                 </div>
               )}
             </div>
-            <UserBadge />
+            <UserBadge compact />
           </div>
 
           {/* Content — panels stacked with absolute positioning so YouTube player always has real dimensions */}
@@ -195,7 +195,7 @@ function AppContent() {
                 },
                 {
                   tab: "timer",
-                  label: "Timer",
+                  label: "Temporizador",
                   icon: (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                       <circle cx="12" cy="13" r="8" />
@@ -206,7 +206,7 @@ function AppContent() {
                 },
                 {
                   tab: "stats",
-                  label: "Stats",
+                  label: "Estadísticas",
                   icon: (
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                       <rect x="3" y="13" width="4" height="8" rx="1" />
