@@ -95,19 +95,19 @@ function AppContent() {
             <UserBadge />
           </div>
 
-          {/* Content — always mounted to keep YouTube player alive across tab switches */}
+          {/* Content — panels stacked with absolute positioning so YouTube player always has real dimensions */}
           <div className="flex-1 min-h-0 overflow-hidden relative">
             <Confetti trigger={showConfetti} />
 
-            <div className={`h-full flex flex-col items-center justify-center px-6 ${mobileTab === "timer" ? "" : "hidden"}`}>
+            <div className={`absolute inset-0 flex flex-col items-center justify-center px-6 transition-opacity duration-150 ${mobileTab === "timer" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <PomodoroTimer labelColor={selectedLabel?.color} />
             </div>
 
-            <div className={`h-full p-3 ${mobileTab === "music" ? "" : "hidden"}`}>
+            <div className={`absolute inset-0 p-3 transition-opacity duration-150 ${mobileTab === "music" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <MusicPanel />
             </div>
 
-            <div className={`h-full overflow-y-auto p-4 flex flex-col gap-3 ${mobileTab === "stats" ? "" : "hidden"}`}>
+            <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTab === "stats" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <Dashboard refreshTrigger={statsVersion} />
               <div className="relative">
                 <button
