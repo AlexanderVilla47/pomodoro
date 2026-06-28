@@ -145,7 +145,7 @@ function AppContent() {
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
                 title="Configuración"
-                className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <circle cx="12" cy="12" r="3" />
