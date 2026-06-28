@@ -47,7 +47,7 @@ function AppContent() {
       onSessionLogged={handleSessionComplete}
       selectedLabelId={selectedLabel?.id ?? null}
     >
-      <div className="h-screen overflow-hidden bg-[var(--color-bg)] text-white">
+      <div className="h-dvh overflow-hidden bg-[var(--color-bg)] text-white">
 
         {/* ── Desktop ── */}
         <div className="hidden md:flex h-full max-w-6xl mx-auto px-4 gap-8">
