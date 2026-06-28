@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { TimerProvider } from "@/context/TimerContext";
+import { YouTubePlayerProvider } from "@/context/YouTubePlayerContext";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { MusicPanel } from "@/components/MusicPanel";
 import { Dashboard } from "@/components/Dashboard";
@@ -42,11 +43,17 @@ function AppContent() {
   };
 
   return (
+    <YouTubePlayerProvider>
     <TimerProvider
       settings={settings}
       onSessionLogged={handleSessionComplete}
       selectedLabelId={selectedLabel?.id ?? null}
     >
+      {/* Single permanent yt-player anchor — always in DOM with real dimensions */}
+      <div aria-hidden="true" style={{ position: "fixed", top: 0, left: 0, width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none", zIndex: -1 }}>
+        <div id="yt-player" />
+      </div>
+
       <div className="h-dvh overflow-hidden bg-[var(--color-bg)] text-white">
 
         {/* ── Desktop ── */}
@@ -181,6 +188,7 @@ function AppContent() {
 
       </div>
     </TimerProvider>
+    </YouTubePlayerProvider>
   );
 }
 

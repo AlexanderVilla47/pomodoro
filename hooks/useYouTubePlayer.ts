@@ -29,7 +29,7 @@ interface YTPlayer {
   playVideoAt: (index: number) => void;
   setVolume: (v: number) => void;
   unMute: () => void;
-  loadPlaylist: (ids: string[]) => void;
+  loadPlaylist: (ids: string[], index?: number, startSeconds?: number) => void;
   cuePlaylist: (ids: string[], index?: number, startSeconds?: number) => void;
   getCurrentTime: () => number;
   getDuration: () => number;
@@ -46,6 +46,7 @@ export function useYouTubePlayer() {
   const playerRef = useRef<YTPlayer | null>(null);
   const videoIdsRef = useRef<string[]>([]);
   const playerStateRef = useRef(-1);
+  const initializingRef = useRef(false);
   const readyPromiseRef = useRef<Promise<void>>(Promise.resolve());
 
   // Poll currentTime while playing
@@ -65,14 +66,18 @@ export function useYouTubePlayer() {
 
   const loadPlayer = useCallback(
     (containerId: string, videoIds: string[]): Promise<void> => {
-      // Reuse existing player — cue the new playlist without disrupting the player state
-      if (playerRef.current) {
+      // Reuse or wait — don't double-init
+      if (playerRef.current || initializingRef.current) {
         setCurrentTime(0);
         setDuration(0);
         videoIdsRef.current = videoIds;
-        playerRef.current.cuePlaylist(videoIds);
-        return Promise.resolve();
+        if (playerRef.current) {
+          playerRef.current.cuePlaylist(videoIds);
+        }
+        return readyPromiseRef.current;
       }
+
+      initializingRef.current = true;
 
       let resolve!: () => void;
       readyPromiseRef.current = new Promise<void>((res) => {
@@ -92,7 +97,7 @@ export function useYouTubePlayer() {
             onStateChange: (e) => {
               setPlayerState(e.data);
               playerStateRef.current = e.data;
-              // Guard: during iframe transitions getDuration is not available
+              // Guard: getDuration is not available during iframe transitions
               if (e.data === 1 && playerRef.current && typeof playerRef.current.getDuration === "function") {
                 const d = playerRef.current.getDuration();
                 if (d > 0) setDuration(d);
@@ -136,18 +141,12 @@ export function useYouTubePlayer() {
     playerRef.current?.previousVideo();
   }, []);
 
+  // loadPlaylist loads AND auto-plays — reliable one-command solution
   const playAt = useCallback((index: number) => {
     setCurrentTime(0);
+    setDuration(0);
     if (!playerRef.current) return;
-    const state = playerStateRef.current;
-    if (state === 1 || state === 2) {
-      // Player already active — safe to jump directly
-      playerRef.current.playVideoAt(index);
-    } else {
-      // Unstarted/cued — cuePlaylist with index avoids iframe URL navigation
-      playerRef.current.cuePlaylist(videoIdsRef.current, index);
-      playerRef.current.playVideo();
-    }
+    playerRef.current.loadPlaylist(videoIdsRef.current, index);
   }, []);
 
   const setVolume = useCallback((v: number) => {
