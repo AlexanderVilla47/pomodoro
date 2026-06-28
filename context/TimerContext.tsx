@@ -54,6 +54,9 @@ export function TimerProvider({
   const sessionStartRef = useRef<number>(Date.now());
   const machineRef = useRef(machine);
   machineRef.current = machine;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const soundTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onSessionLoggedRef = useRef(onSessionLogged);
   onSessionLoggedRef.current = onSessionLogged;
@@ -84,13 +87,21 @@ export function TimerProvider({
 
   useEffect(() => {
     const handleSessionEnd = (m: MachineState) => {
-      notifySessionComplete(m.phase, settings.notification_sound_enabled);
+      // Sound is fired by the dedicated setTimeout effect, not here
       const elapsed = phaseDuration(m.phase, settings);
       doLog(m, elapsed, true);
 
       const afterComplete = transition(m, "COMPLETE");
-      const afterStart = transition(afterComplete, "START");
 
+      // Full cycle done — stop after long break, user restarts manually
+      if (m.phase === "long_break") {
+        endTimeRef.current = null;
+        localStorage.removeItem(LS_KEY);
+        setMachine(afterComplete);
+        return;
+      }
+
+      const afterStart = transition(afterComplete, "START");
       if (afterStart.status === "running") {
         const nextDur = phaseDuration(afterStart.phase, settings);
         endTimeRef.current = Date.now() + nextDur;
@@ -102,7 +113,6 @@ export function TimerProvider({
         endTimeRef.current = null;
         localStorage.removeItem(LS_KEY);
       }
-
       setMachine(afterStart);
     };
 
@@ -115,7 +125,7 @@ export function TimerProvider({
     };
 
     // GSAP lag smoothing masks expired time in background tabs —
-    // check wall clock directly when the tab becomes visible again
+    // check wall clock directly when tab becomes visible
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       const m = machineRef.current;
@@ -132,6 +142,29 @@ export function TimerProvider({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [settings, doLog]);
+
+  // setTimeout fires at exact expiry time even in background tabs —
+  // GSAP ticker can't be relied on for sound since it throttles in background
+  useEffect(() => {
+    if (machine.status !== "running" || endTimeRef.current === null) {
+      if (soundTimeoutRef.current !== null) {
+        clearTimeout(soundTimeoutRef.current);
+        soundTimeoutRef.current = null;
+      }
+      return;
+    }
+    const delay = Math.max(0, endTimeRef.current - Date.now());
+    const phase = machine.phase;
+    soundTimeoutRef.current = setTimeout(() => {
+      notifySessionComplete(phase, settingsRef.current.notification_sound_enabled);
+    }, delay);
+    return () => {
+      if (soundTimeoutRef.current !== null) {
+        clearTimeout(soundTimeoutRef.current);
+        soundTimeoutRef.current = null;
+      }
+    };
+  }, [machine.status, machine.phase]);
 
   useEffect(() => {
     if (machine.status === "idle" || machine.status === "completed") {
