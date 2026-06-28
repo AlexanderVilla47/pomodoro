@@ -27,7 +27,7 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
     const iv = parseInt(interval, 10);
 
     if (!work || work < 1 || work > 120) {
-      setError("Trabajo: debe ser entre 1 y 120 minutos");
+      setError("Tiempo de enfoque: debe ser entre 1 y 120 minutos");
       return;
     }
     if (!short || short < 1 || short > 60) {
@@ -73,7 +73,7 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
       <div className="grid grid-cols-2 gap-3">
         <div className={field}>
           <label htmlFor="work_duration" className={label}>
-            Trabajo (min)
+            Tiempo de enfoque (min)
           </label>
           <input
             id="work_duration"
@@ -102,6 +102,21 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
         </div>
 
         <div className={field}>
+          <label htmlFor="interval" className={label}>
+            Intervalos hasta descanso largo
+          </label>
+          <input
+            id="interval"
+            type="number"
+            min={1}
+            max={10}
+            value={interval}
+            onChange={(e) => setIntervalVal(e.target.value)}
+            className={input}
+          />
+        </div>
+
+        <div className={field}>
           <label htmlFor="long_break" className={label}>
             Descanso largo (min)
           </label>
@@ -112,21 +127,6 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
             max={60}
             value={longMin}
             onChange={(e) => setLongMin(e.target.value)}
-            className={input}
-          />
-        </div>
-
-        <div className={field}>
-          <label htmlFor="interval" className={label}>
-            Intervalo largo
-          </label>
-          <input
-            id="interval"
-            type="number"
-            min={1}
-            max={10}
-            value={interval}
-            onChange={(e) => setIntervalVal(e.target.value)}
             className={input}
           />
         </div>
