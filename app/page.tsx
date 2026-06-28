@@ -14,12 +14,15 @@ import { requestNotificationPermission } from "@/lib/notifications";
 import type { Settings } from "@/lib/db/queries/settings";
 import { UserBadge } from "@/components/UserBadge";
 
+type MobileTab = "timer" | "music" | "stats";
+
 function AppContent() {
   const { settings, updateSettings } = useSettings();
   const [statsVersion, setStatsVersion] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("timer");
 
   const handleSessionComplete = useCallback(() => {
     setStatsVersion((v) => v + 1);
@@ -33,6 +36,11 @@ function AppContent() {
 
   if (!settings) return null;
 
+  const settingsPatch = (patch: Partial<Omit<Settings, "id">>) => {
+    updateSettings(patch);
+    setSettingsOpen(false);
+  };
+
   return (
     <TimerProvider
       settings={settings}
@@ -40,9 +48,10 @@ function AppContent() {
       selectedLabelId={selectedLabel?.id ?? null}
     >
       <div className="h-screen overflow-hidden bg-[var(--color-bg)] text-white">
-        <div className="h-full max-w-6xl mx-auto px-4 flex gap-8">
 
-          {/* Izquierda: timer centrado, label selector arriba a la izquierda */}
+        {/* ── Desktop ── */}
+        <div className="hidden md:flex h-full max-w-6xl mx-auto px-4 gap-8">
+
           <div className="flex-1 flex flex-col items-center justify-center relative">
             <Confetti trigger={showConfetti} />
             <div className="absolute top-4 left-0">
@@ -51,17 +60,13 @@ function AppContent() {
             <PomodoroTimer labelColor={selectedLabel?.color} />
           </div>
 
-          {/* Derecha: columna flex, MusicPanel toma el espacio restante */}
           <div className="w-[440px] shrink-0 flex flex-col gap-3 py-6 overflow-hidden">
-
             <div className="shrink-0">
               <Dashboard refreshTrigger={statsVersion} />
             </div>
-
             <div className="flex-1 min-h-0">
               <MusicPanel />
             </div>
-
             <div className="shrink-0 flex gap-2 relative">
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
@@ -69,25 +74,87 @@ function AppContent() {
               >
                 {settingsOpen ? "✕ Cerrar" : "⚙ Configuración"}
               </button>
-
               <UserBadge className="flex-1 min-w-0" />
-
               {settingsOpen && (
                 <div className="absolute bottom-full left-0 right-0 mb-2 z-20 max-h-[70vh] overflow-y-auto no-scrollbar bg-[var(--color-bg)] rounded-2xl">
-                  <SettingsPanel
-                    settings={settings}
-                    onSave={(patch) => {
-                      updateSettings(patch as Partial<Omit<Settings, "id">>);
-                      setSettingsOpen(false);
-                    }}
-                  />
+                  <SettingsPanel settings={settings} onSave={settingsPatch} />
                 </div>
               )}
             </div>
-
           </div>
 
         </div>
+
+        {/* ── Mobile ── */}
+        <div className="flex flex-col h-full md:hidden">
+
+          {/* Header */}
+          <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-white/5">
+            <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={setSelectedLabel} />
+            <div className="flex-1" />
+            <UserBadge />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-h-0 overflow-hidden relative">
+            <Confetti trigger={showConfetti} />
+
+            {mobileTab === "timer" && (
+              <div className="h-full flex flex-col items-center justify-center px-6 gap-0">
+                <PomodoroTimer labelColor={selectedLabel?.color} />
+              </div>
+            )}
+
+            {mobileTab === "music" && (
+              <div className="h-full p-3">
+                <MusicPanel />
+              </div>
+            )}
+
+            {mobileTab === "stats" && (
+              <div className="h-full overflow-y-auto p-4 flex flex-col gap-3">
+                <Dashboard refreshTrigger={statsVersion} />
+                <div className="relative">
+                  <button
+                    onClick={() => setSettingsOpen((o) => !o)}
+                    className="w-full py-2 px-4 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    {settingsOpen ? "✕ Cerrar configuración" : "⚙ Configuración"}
+                  </button>
+                  {settingsOpen && (
+                    <div className="mt-2">
+                      <SettingsPanel settings={settings} onSave={settingsPatch} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tab bar */}
+          <div className="shrink-0 flex border-t border-white/10 bg-[var(--color-bg)]" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+            {(
+              [
+                { tab: "timer", icon: "⏱", label: "Timer" },
+                { tab: "music", icon: "♪", label: "Música" },
+                { tab: "stats", icon: "◈", label: "Stats" },
+              ] as const
+            ).map(({ tab, icon, label }) => (
+              <button
+                key={tab}
+                onClick={() => setMobileTab(tab)}
+                className={`flex-1 flex flex-col items-center gap-0.5 py-3 text-[10px] font-medium transition-colors ${
+                  mobileTab === tab ? "text-mint" : "text-white/30 hover:text-white/60"
+                }`}
+              >
+                <span className="text-base leading-none">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+
+        </div>
+
       </div>
     </TimerProvider>
   );
