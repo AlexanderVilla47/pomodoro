@@ -95,7 +95,7 @@ export function LabelSelector({ selectedId, onChange }: Props) {
             <span className="font-medium" style={{ color: selectedLabel.color }}>{selectedLabel.name}</span>
           </>
         ) : (
-          <span className="text-white/35">Etiqueta</span>
+          <span className="text-white/35 text-xs">¿En qué trabajás?</span>
         )}
         <span className="text-white/25 text-[10px] ml-1">{open ? "▲" : "▼"}</span>
       </button>
