@@ -126,10 +126,11 @@ export function MusicPanel() {
             />
           </div>
 
+          {/* Always mounted so #yt-player exists in the DOM before loadPlayer runs */}
+          <YouTubePlayer />
+
           {viewedTracks.length > 0 ? (
             <>
-              <YouTubePlayer />
-
               <div className="shrink-0">
                 <PlayerControls
                   isReady={player.isReady}
