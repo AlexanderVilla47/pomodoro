@@ -63,14 +63,14 @@ function AppContent() {
             </div>
 
             <div className="shrink-0 flex gap-2 relative">
-              <UserBadge className="flex-1 min-w-0" />
-
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
                 className="flex-1 py-2 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {settingsOpen ? "✕ Cerrar" : "⚙ Configuración"}
               </button>
+
+              <UserBadge className="flex-1 min-w-0" />
 
               {settingsOpen && (
                 <div className="absolute bottom-full left-0 right-0 mb-2 z-20 max-h-[70vh] overflow-y-auto no-scrollbar bg-[var(--color-bg)] rounded-2xl">
