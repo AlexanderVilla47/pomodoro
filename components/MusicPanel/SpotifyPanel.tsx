@@ -141,7 +141,17 @@ export function SpotifyPanel() {
       </div>
 
       {msg && (
-        <p className="shrink-0 text-xs text-white/40 text-center py-1">{msg}</p>
+        <div className="shrink-0 text-center py-1">
+          <p className="text-xs text-white/40">{msg}</p>
+          {player.status === "error" && (
+            <button
+              onClick={handleDisconnect}
+              className="mt-2 text-xs text-[#1DB954] hover:underline"
+            >
+              Reconectar cuenta
+            </button>
+          )}
+        </div>
       )}
 
       {tracks.length > 0 && (

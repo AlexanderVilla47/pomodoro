@@ -68,7 +68,11 @@ export function useSpotifyPlayer() {
         name: "Pomodoro",
         getOAuthToken: async (cb) => {
           const token = await getToken();
-          if (token) cb(token);
+          if (token) {
+            cb(token);
+          } else {
+            setStatus("error");
+          }
         },
         volume: 0.8,
       });
@@ -99,7 +103,9 @@ export function useSpotifyPlayer() {
         if (idx >= 0) currentIndexRef.current = idx;
       });
 
-      p.connect();
+      p.connect().then((ok) => {
+        if (!ok) setStatus("error");
+      });
       playerRef.current = p;
     };
 
