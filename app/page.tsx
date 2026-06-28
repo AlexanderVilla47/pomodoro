@@ -32,6 +32,13 @@ function AppContent() {
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("timer");
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("pomodoro-selected-label");
+      if (stored) setSelectedLabel(JSON.parse(stored));
+    } catch {}
+  }, []);
+
   const handleSessionComplete = useCallback(() => {
     setStatsVersion((v) => v + 1);
     setShowConfetti(true);
@@ -47,6 +54,15 @@ function AppContent() {
     document.documentElement.style.setProperty("--color-mint", color);
     document.documentElement.style.setProperty("--color-mint-rgb", hexToRgb(color));
   }, [selectedLabel]);
+
+  const handleLabelChange = useCallback((label: Label | null) => {
+    setSelectedLabel(label);
+    if (label) {
+      localStorage.setItem("pomodoro-selected-label", JSON.stringify(label));
+    } else {
+      localStorage.removeItem("pomodoro-selected-label");
+    }
+  }, []);
 
   if (!settings) return null;
 
@@ -70,36 +86,49 @@ function AppContent() {
       <div className="h-dvh overflow-hidden bg-[var(--color-bg)] text-white">
 
         {/* ── Desktop ── */}
-        <div className="hidden md:flex h-full max-w-6xl mx-auto px-4 gap-8">
+        <div className="hidden md:flex flex-col h-full max-w-6xl mx-auto px-4">
 
-          <div className="flex-1 flex flex-col items-center justify-center relative">
-            <Confetti trigger={showConfetti} />
-            <div className="absolute top-4 left-0">
-              <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={setSelectedLabel} />
+          {/* Top bar — mirrors the same gap-8 column split so gear aligns flush with timer edge */}
+          <div className="shrink-0 flex items-center gap-8 pt-4 pb-0">
+            <div className="flex-1 flex items-center justify-between">
+              <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={handleLabelChange} />
+              <div className="relative">
+                <button
+                  onClick={() => setSettingsOpen((o) => !o)}
+                  title="Configuración"
+                  className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </button>
+                {settingsOpen && (
+                  <div className="absolute top-full right-0 mt-2 z-20 w-[360px] max-h-[70vh] overflow-y-auto no-scrollbar bg-[var(--color-bg)] rounded-2xl shadow-2xl border border-white/10">
+                    <SettingsPanel settings={settings} onSave={settingsPatch} />
+                  </div>
+                )}
+              </div>
             </div>
-            <PomodoroTimer labelColor={selectedLabel?.color} />
+            <div className="w-[440px] shrink-0">
+              <UserBadge className="w-full" />
+            </div>
           </div>
 
-          <div className="w-[440px] shrink-0 flex flex-col gap-3 py-6 overflow-hidden">
-            <div className="shrink-0">
-              <Dashboard refreshTrigger={statsVersion} />
+          {/* Main content */}
+          <div className="flex flex-1 gap-8 min-h-0 pb-6">
+            <div className="flex-1 flex flex-col items-center justify-center relative">
+              <Confetti trigger={showConfetti} />
+              <PomodoroTimer labelColor={selectedLabel?.color} />
             </div>
-            <div className="flex-1 min-h-0">
-              <MusicPanel />
-            </div>
-            <div className="shrink-0 flex gap-2 relative">
-              <button
-                onClick={() => setSettingsOpen((o) => !o)}
-                className="flex-1 py-2 px-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                {settingsOpen ? "✕ Cerrar" : "⚙ Configuración"}
-              </button>
-              <UserBadge className="flex-1 min-w-0" />
-              {settingsOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 z-20 max-h-[70vh] overflow-y-auto no-scrollbar bg-[var(--color-bg)] rounded-2xl">
-                  <SettingsPanel settings={settings} onSave={settingsPatch} />
-                </div>
-              )}
+
+            <div className="w-[440px] shrink-0 flex flex-col gap-3 pt-3 pb-6 overflow-hidden">
+              <div className="shrink-0">
+                <Dashboard refreshTrigger={statsVersion} />
+              </div>
+              <div className="flex-1 min-h-0">
+                <MusicPanel />
+              </div>
             </div>
           </div>
 
@@ -110,8 +139,25 @@ function AppContent() {
 
           {/* Header */}
           <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-white/5">
-            <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={setSelectedLabel} />
+            <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={handleLabelChange} />
             <div className="flex-1" />
+            <div className="relative">
+              <button
+                onClick={() => setSettingsOpen((o) => !o)}
+                title="Configuración"
+                className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+              {settingsOpen && (
+                <div className="absolute top-full right-0 mt-2 z-20 w-[340px] max-h-[70vh] overflow-y-auto no-scrollbar bg-[var(--color-bg)] rounded-2xl shadow-2xl border border-white/10">
+                  <SettingsPanel settings={settings} onSave={settingsPatch} />
+                </div>
+              )}
+            </div>
             <UserBadge />
           </div>
 
@@ -129,19 +175,6 @@ function AppContent() {
 
             <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTab === "stats" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <Dashboard refreshTrigger={statsVersion} />
-              <div className="relative">
-                <button
-                  onClick={() => setSettingsOpen((o) => !o)}
-                  className="w-full py-2 px-4 rounded-xl bg-white/5 border border-white/10 text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  {settingsOpen ? "✕ Cerrar configuración" : "⚙ Configuración"}
-                </button>
-                {settingsOpen && (
-                  <div className="mt-2">
-                    <SettingsPanel settings={settings} onSave={settingsPatch} />
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 

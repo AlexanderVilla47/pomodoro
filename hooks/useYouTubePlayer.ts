@@ -71,9 +71,12 @@ export function useYouTubePlayer() {
         setCurrentTime(0);
         setDuration(0);
         videoIdsRef.current = videoIds;
-        if (playerRef.current) {
-          playerRef.current.cuePlaylist(videoIds);
-        }
+        // Schedule after ready — player object may exist but not yet accept commands
+        readyPromiseRef.current.then(() => {
+          if (playerRef.current && typeof playerRef.current.cuePlaylist === "function") {
+            playerRef.current.cuePlaylist(videoIdsRef.current);
+          }
+        });
         return readyPromiseRef.current;
       }
 
@@ -89,8 +92,7 @@ export function useYouTubePlayer() {
           playerVars: { autoplay: 0, controls: 0 },
           events: {
             onReady: (e) => {
-              videoIdsRef.current = videoIds;
-              e.target.cuePlaylist(videoIds);
+              e.target.cuePlaylist(videoIdsRef.current);
               setIsReady(true);
               resolve();
             },

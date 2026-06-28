@@ -33,7 +33,7 @@ export function TimerControls({
           className={`${btnBase} text-white hover:brightness-110`}
           style={{ backgroundColor: accentColor }}
         >
-          Start
+          Iniciar
         </button>
       )}
 
@@ -44,21 +44,21 @@ export function TimerControls({
             aria-label="Pause"
             className={`${btnBase} bg-white/10 text-white hover:bg-white/20`}
           >
-            Pause
+            Pausar
           </button>
           <button
             onClick={onStop}
             aria-label="Stop"
             className={`${btnBase} bg-white/10 text-white hover:bg-white/20`}
           >
-            Stop
+            Detener
           </button>
           <button
             onClick={onSkip}
             aria-label="Skip"
             className={`${btnBase} bg-white/5 text-white/50 hover:text-white`}
           >
-            Skip
+            Saltar
           </button>
         </>
       )}
@@ -71,21 +71,21 @@ export function TimerControls({
             className={`${btnBase} text-white hover:brightness-110`}
             style={{ backgroundColor: accentColor }}
           >
-            Resume
+            Retomar
           </button>
           <button
             onClick={onStop}
             aria-label="Stop"
             className={`${btnBase} bg-white/10 text-white hover:bg-white/20`}
           >
-            Stop
+            Detener
           </button>
           <button
             onClick={onSkip}
             aria-label="Skip"
             className={`${btnBase} bg-white/5 text-white/50 hover:text-white`}
           >
-            Skip
+            Saltar
           </button>
         </>
       )}
