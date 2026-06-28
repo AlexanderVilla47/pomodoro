@@ -17,7 +17,7 @@ const btnBase =
 
 export function TimerControls({
   status,
-  accentColor = "var(--color-coral)",
+  accentColor = "var(--color-mint)",
   onStart,
   onPause,
   onResume,

@@ -58,7 +58,7 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
   const field = "flex flex-col gap-1";
   const label = "text-xs text-white/50";
   const input =
-    "bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white w-full focus:outline-none focus:border-coral/50";
+    "bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white w-full focus:outline-none focus:border-mint/50";
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 p-5 rounded-2xl bg-white/5 border border-white/10">
@@ -137,14 +137,14 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
           type="checkbox"
           checked={sound}
           onChange={(e) => setSound(e.target.checked)}
-          className="w-4 h-4 accent-coral"
+          className="w-4 h-4 accent-mint"
         />
         <span className="text-sm text-white/60">Sonido de notificación</span>
       </label>
 
       <button
         type="submit"
-        className="w-full py-2 rounded-lg bg-coral/20 text-coral font-semibold text-sm hover:bg-coral/30 transition-colors"
+        className="w-full py-2 rounded-lg bg-mint/20 text-mint font-semibold text-sm hover:bg-mint/30 transition-colors"
       >
         {saved ? "✓ Guardado" : "Guardar"}
       </button>
