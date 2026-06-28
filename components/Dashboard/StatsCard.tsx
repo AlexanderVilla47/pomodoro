@@ -37,24 +37,24 @@ export function StatsCard({ label, count, totalSeconds, isLoading }: StatsCardPr
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10 animate-pulse">
+      <div className="flex flex-col gap-1 p-3 rounded-xl bg-white/5 border border-white/10 animate-pulse">
         <span className="text-xs uppercase tracking-wider text-white/40">{label}</span>
-        <div className="h-9 w-16 rounded bg-white/10 mt-1" />
-        <div className="h-4 w-10 rounded bg-white/10 mt-1" />
+        <div className="h-7 w-12 rounded bg-white/10 mt-0.5" />
+        <div className="h-3.5 w-8 rounded bg-white/10 mt-0.5" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1 p-4 rounded-xl bg-white/5 border border-white/10">
+    <div className="flex flex-col gap-0.5 p-3 rounded-xl bg-white/5 border border-white/10">
       <span className="text-xs uppercase tracking-wider text-white/40">{label}</span>
-      <div className="flex items-baseline gap-2">
-        <span ref={countRef} className="text-3xl font-bold text-white">
+      <div className="flex items-baseline gap-1.5">
+        <span ref={countRef} className="text-2xl font-bold text-white">
           {count}
         </span>
-        <span className="text-sm text-white/40">sesiones</span>
+        <span className="text-xs text-white/40">sesiones</span>
       </div>
-      <span className="text-sm text-white/60">{formatDuration(totalSeconds)}</span>
+      <span className="text-xs text-white/60">{formatDuration(totalSeconds)}</span>
     </div>
   );
 }

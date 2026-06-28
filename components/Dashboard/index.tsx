@@ -57,9 +57,9 @@ export function Dashboard({ refreshTrigger }: DashboardProps) {
   return (
     <div className="relative">
       {/* Card principal — altura fija, no se mueve */}
-      <div className="flex flex-col gap-3 p-5 rounded-2xl bg-white/5 border border-white/10">
+      <div className="flex flex-col gap-2 p-3 rounded-2xl bg-white/5 border border-white/10">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">Progreso</h3>
+          <h3 className="text-xs font-semibold text-white/70 uppercase tracking-wider">Progreso</h3>
           <button
             onClick={() => setExpanded((e) => !e)}
             className="text-xs text-white/30 hover:text-white/60 transition-colors"
@@ -68,7 +68,7 @@ export function Dashboard({ refreshTrigger }: DashboardProps) {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           <StatsCard
             label="Hoy"
             count={stats?.today.count ?? 0}
