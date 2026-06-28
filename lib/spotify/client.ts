@@ -168,7 +168,7 @@ export async function getPlaylistTracks(
   let url: string | null = `${API_URL}/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,uri,name,duration_ms,artists,album(images)))`;
 
   while (url) {
-    const res = await fetch(url, {
+    const res: Response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) break;
