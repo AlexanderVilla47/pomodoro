@@ -5,6 +5,12 @@ vi.mock("@/lib/db/queries/settings", () => ({
   getSettings: vi.fn(),
   upsertSettings: vi.fn(),
 }));
+vi.mock("@/lib/auth/session", () => ({
+  getSession: vi.fn().mockResolvedValue({
+    user: { id: "test-user-id", email: "test@test.com", name: "Test User" },
+    session: { id: "test-session-id" },
+  }),
+}));
 
 import { GET, PUT } from "../settings/route";
 import { getSettings, upsertSettings } from "@/lib/db/queries/settings";
@@ -24,7 +30,7 @@ const DEFAULT_SETTINGS = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGet.mockResolvedValue(DEFAULT_SETTINGS);
-  mockUpsert.mockImplementation(async (_db, patch) => ({ ...DEFAULT_SETTINGS, ...patch }));
+  mockUpsert.mockImplementation(async (_db, _userId, patch) => ({ ...DEFAULT_SETTINGS, ...patch }));
 });
 
 describe("GET /api/settings", () => {

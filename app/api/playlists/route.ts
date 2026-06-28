@@ -2,8 +2,12 @@ import { getDb } from "@/lib/db/index";
 import { upsertPlaylist, upsertTracks, getPlaylists } from "@/lib/db/queries/playlists";
 import { extractPlaylistId } from "@/lib/youtube/parseUrl";
 import { fetchPlaylistItems, fetchPlaylistInfo } from "@/lib/youtube/client";
+import { getSession } from "@/lib/auth/session";
 
 export async function POST(req: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   let body: { url?: string };
   try {
     body = await req.json();
@@ -31,7 +35,7 @@ export async function POST(req: Request) {
   ]);
 
   const db = getDb();
-  const playlist = await upsertPlaylist(db, {
+  const playlist = await upsertPlaylist(db, session.user.id, {
     playlist_id: playlistId,
     title: info.title,
     thumbnail_url: info.thumbnailUrl,
@@ -52,6 +56,9 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   const db = getDb();
-  return Response.json(await getPlaylists(db));
+  return Response.json(await getPlaylists(db, session.user.id));
 }

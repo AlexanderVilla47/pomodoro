@@ -1,12 +1,19 @@
 import { getDb } from "@/lib/db/index";
 import { getSettings, upsertSettings } from "@/lib/db/queries/settings";
+import { getSession } from "@/lib/auth/session";
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   const db = getDb();
-  return Response.json(await getSettings(db));
+  return Response.json(await getSettings(db, session.user.id));
 }
 
 export async function PUT(req: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -31,6 +38,6 @@ export async function PUT(req: Request) {
   }
 
   const db = getDb();
-  const updated = await upsertSettings(db, body as Parameters<typeof upsertSettings>[1]);
+  const updated = await upsertSettings(db, session.user.id, body as Parameters<typeof upsertSettings>[2]);
   return Response.json(updated);
 }

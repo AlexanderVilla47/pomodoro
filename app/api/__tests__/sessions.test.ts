@@ -4,6 +4,12 @@ vi.mock("@/lib/db/index", () => ({ getDb: () => ({}) }));
 vi.mock("@/lib/db/queries/sessions", () => ({
   insertSession: vi.fn(),
 }));
+vi.mock("@/lib/auth/session", () => ({
+  getSession: vi.fn().mockResolvedValue({
+    user: { id: "test-user-id", email: "test@test.com", name: "Test User" },
+    session: { id: "test-session-id" },
+  }),
+}));
 
 import { POST } from "../sessions/route";
 import { insertSession } from "@/lib/db/queries/sessions";

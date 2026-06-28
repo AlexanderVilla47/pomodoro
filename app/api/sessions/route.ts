@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db/index";
 import { insertSession } from "@/lib/db/queries/sessions";
 import { shouldLog } from "@/lib/timer/engine";
 import type { SessionType } from "@/lib/db/queries/sessions";
+import { getSession } from "@/lib/auth/session";
 
 interface SessionBody {
   type: SessionType;
@@ -16,6 +17,9 @@ interface SessionBody {
 const VALID_TYPES = new Set(["work", "short_break", "long_break"]);
 
 export async function POST(req: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   let body: Partial<SessionBody>;
   try {
     body = await req.json();
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const id = await insertSession(db, {
+  const id = await insertSession(db, session.user.id, {
     type,
     started_at,
     ended_at,

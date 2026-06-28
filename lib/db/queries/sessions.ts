@@ -24,10 +24,11 @@ export interface DayStats {
   total_seconds: number;
 }
 
-export async function insertSession(sql: Sql, data: NewSession): Promise<number> {
+export async function insertSession(sql: Sql, userId: string, data: NewSession): Promise<number> {
   const [row] = await sql<[{ id: number }]>`
-    INSERT INTO sessions (type, started_at, ended_at, planned_duration, actual_duration, completed, label_id)
+    INSERT INTO sessions (user_id, type, started_at, ended_at, planned_duration, actual_duration, completed, label_id)
     VALUES (
+      ${userId},
       ${data.type},
       ${data.started_at},
       ${data.ended_at},
@@ -41,26 +42,28 @@ export async function insertSession(sql: Sql, data: NewSession): Promise<number>
   return row.id;
 }
 
-export async function getStatsForToday(sql: Sql, tzOffsetMinutes: number): Promise<SessionStats> {
+export async function getStatsForToday(sql: Sql, userId: string, tzOffsetMinutes: number): Promise<SessionStats> {
   const [row] = await sql<[{ count: number; total_seconds: number }]>`
     SELECT
       COUNT(*)::int AS count,
       COALESCE(SUM(actual_duration), 0)::int AS total_seconds
     FROM sessions
-    WHERE type = 'work'
+    WHERE user_id = ${userId}
+      AND type = 'work'
       AND (started_at + make_interval(mins => ${tzOffsetMinutes}))::date
           = (NOW() + make_interval(mins => ${tzOffsetMinutes}))::date
   `;
   return { count: Number(row.count), total_seconds: Number(row.total_seconds) };
 }
 
-export async function getStatsForWeek(sql: Sql, tzOffsetMinutes: number): Promise<SessionStats> {
+export async function getStatsForWeek(sql: Sql, userId: string, tzOffsetMinutes: number): Promise<SessionStats> {
   const [row] = await sql<[{ count: number; total_seconds: number }]>`
     SELECT
       COUNT(*)::int AS count,
       COALESCE(SUM(actual_duration), 0)::int AS total_seconds
     FROM sessions
-    WHERE type = 'work'
+    WHERE user_id = ${userId}
+      AND type = 'work'
       AND (started_at + make_interval(mins => ${tzOffsetMinutes}))::date
           >= (NOW() + make_interval(mins => ${tzOffsetMinutes}) - interval '6 days')::date
   `;
@@ -69,6 +72,7 @@ export async function getStatsForWeek(sql: Sql, tzOffsetMinutes: number): Promis
 
 export async function getDailyStatsForYear(
   sql: Sql,
+  userId: string,
   year: number,
   tzOffsetMinutes: number
 ): Promise<DayStats[]> {
@@ -77,7 +81,8 @@ export async function getDailyStatsForYear(
       (started_at + make_interval(mins => ${tzOffsetMinutes}))::date::text AS day,
       COALESCE(SUM(actual_duration), 0)::int AS total_seconds
     FROM sessions
-    WHERE type = 'work'
+    WHERE user_id = ${userId}
+      AND type = 'work'
       AND EXTRACT(YEAR FROM (started_at + make_interval(mins => ${tzOffsetMinutes}))) = ${year}
     GROUP BY day
     ORDER BY day
@@ -85,11 +90,12 @@ export async function getDailyStatsForYear(
   return rows.map((r) => ({ date: r.day, total_seconds: Number(r.total_seconds) }));
 }
 
-export async function getYearsWithData(sql: Sql): Promise<number[]> {
+export async function getYearsWithData(sql: Sql, userId: string): Promise<number[]> {
   const rows = await sql<Array<{ year: number }>>`
     SELECT DISTINCT EXTRACT(YEAR FROM started_at)::int AS year
     FROM sessions
-    WHERE type = 'work'
+    WHERE user_id = ${userId}
+      AND type = 'work'
     ORDER BY year DESC
   `;
   return rows.map((r) => Number(r.year));

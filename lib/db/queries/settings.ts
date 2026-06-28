@@ -22,16 +22,17 @@ type RawRow = {
   notification_sound_enabled: number;
 };
 
-export async function getSettings(sql: Sql): Promise<Settings> {
-  const [row] = await sql<[RawRow]>`SELECT * FROM settings WHERE id = 1`;
+export async function getSettings(sql: Sql, userId: string): Promise<Settings> {
+  await sql`INSERT INTO settings (user_id) VALUES (${userId}) ON CONFLICT (user_id) DO NOTHING`;
+  const [row] = await sql<[RawRow]>`SELECT * FROM settings WHERE user_id = ${userId}`;
   return {
     ...row,
     notification_sound_enabled: row.notification_sound_enabled === 1,
   };
 }
 
-export async function upsertSettings(sql: Sql, patch: SettingsPatch): Promise<Settings> {
-  const current = await getSettings(sql);
+export async function upsertSettings(sql: Sql, userId: string, patch: SettingsPatch): Promise<Settings> {
+  const current = await getSettings(sql, userId);
 
   const next = {
     work_duration: patch.work_duration ?? current.work_duration,
@@ -56,11 +57,11 @@ export async function upsertSettings(sql: Sql, patch: SettingsPatch): Promise<Se
       long_break_interval = ${next.long_break_interval},
       notification_sound_enabled = ${next.notification_sound_enabled},
       updated_at = NOW()
-    WHERE id = 1
+    WHERE user_id = ${userId}
   `;
 
   return {
-    id: 1,
+    id: current.id,
     ...next,
     notification_sound_enabled: next.notification_sound_enabled === 1,
   };

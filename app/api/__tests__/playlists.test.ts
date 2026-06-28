@@ -6,6 +6,12 @@ vi.mock("@/lib/db/queries/playlists", () => ({
   upsertTracks: vi.fn(),
   getPlaylists: vi.fn(),
 }));
+vi.mock("@/lib/auth/session", () => ({
+  getSession: vi.fn().mockResolvedValue({
+    user: { id: "test-user-id", email: "test@test.com", name: "Test User" },
+    session: { id: "test-session-id" },
+  }),
+}));
 vi.mock("@/lib/youtube/client", () => ({
   fetchPlaylistItems: vi.fn(),
   fetchPlaylistInfo: vi.fn(),

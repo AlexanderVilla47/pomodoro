@@ -13,30 +13,31 @@ export interface LabelStats extends Label {
   total_seconds: number;
 }
 
-export async function getLabels(sql: Sql): Promise<Label[]> {
-  return sql<Label[]>`SELECT id, name, color FROM labels ORDER BY name`;
+export async function getLabels(sql: Sql, userId: string): Promise<Label[]> {
+  return sql<Label[]>`SELECT id, name, color FROM labels WHERE user_id = ${userId} ORDER BY name`;
 }
 
-export async function createLabel(sql: Sql, name: string, color: string): Promise<Label> {
+export async function createLabel(sql: Sql, userId: string, name: string, color: string): Promise<Label> {
   const [row] = await sql<Label[]>`
-    INSERT INTO labels (name, color) VALUES (${name}, ${color})
+    INSERT INTO labels (user_id, name, color) VALUES (${userId}, ${name}, ${color})
     RETURNING id, name, color
   `;
   return row;
 }
 
-export async function deleteLabel(sql: Sql, id: number): Promise<void> {
-  await sql`DELETE FROM labels WHERE id = ${id}`;
+export async function deleteLabel(sql: Sql, userId: string, id: number): Promise<void> {
+  await sql`DELETE FROM labels WHERE id = ${id} AND user_id = ${userId}`;
 }
 
-export async function getLabelStats(sql: Sql): Promise<LabelStats[]> {
+export async function getLabelStats(sql: Sql, userId: string): Promise<LabelStats[]> {
   const rows = await sql<Array<{ id: number; name: string; color: string; count: string; total_seconds: string }>>`
     SELECT
       l.id, l.name, l.color,
       COUNT(s.id)::int AS count,
       COALESCE(SUM(s.actual_duration), 0)::int AS total_seconds
     FROM labels l
-    LEFT JOIN sessions s ON s.label_id = l.id AND s.type = 'work'
+    LEFT JOIN sessions s ON s.label_id = l.id AND s.type = 'work' AND s.user_id = ${userId}
+    WHERE l.user_id = ${userId}
     GROUP BY l.id
     ORDER BY total_seconds DESC
   `;
