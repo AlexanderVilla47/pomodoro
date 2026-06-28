@@ -2,18 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { SetupGuide } from "./SetupGuide";
-import { YouTubePlayer } from "./YouTubePlayer";
 import { PlayerControls } from "./PlayerControls";
 import { TrackList } from "./TrackList";
 import { PlaylistSwitcher } from "./PlaylistSwitcher";
 import { SpotifyPanel } from "./SpotifyPanel";
-import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
+import { useYTPlayer } from "@/context/YouTubePlayerContext";
 import type { Track } from "@/lib/db/queries/playlists";
 
 type Source = "youtube" | "spotify";
 
 export function MusicPanel() {
-  const player = useYouTubePlayer();
+  const player = useYTPlayer();
   const [source, setSource] = useState<Source>("youtube");
   const [configured, setConfigured] = useState<boolean | null>(null);
 
@@ -125,9 +124,6 @@ export function MusicPanel() {
               onDelete={handleDelete}
             />
           </div>
-
-          {/* Always mounted so #yt-player exists in the DOM before loadPlayer runs */}
-          <YouTubePlayer />
 
           {viewedTracks.length > 0 ? (
             <>
