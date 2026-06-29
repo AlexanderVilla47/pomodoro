@@ -1,9 +1,10 @@
 import { defaultCache } from "@serwist/next/worker";
 import { Serwist } from "serwist";
 
-declare const self: ServiceWorkerGlobalScope & {
-  __SW_MANIFEST: (string | { url: string; revision: string | null })[];
-};
+declare const self: Window &
+  typeof globalThis & {
+    __SW_MANIFEST: (string | { url: string; revision: string | null })[];
+  };
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
