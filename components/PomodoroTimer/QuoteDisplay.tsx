@@ -10,7 +10,7 @@ interface QuoteDisplayProps {
 }
 
 const REVEAL_DURATION_MS = 8000;
-const ROTATE_INTERVAL_MS = 30000;
+const ROTATE_INTERVAL_MS = 180000;
 
 export const QuoteDisplay = memo(function QuoteDisplay({ phase, status }: QuoteDisplayProps) {
   const [index, setIndex] = useState(() => Math.floor(Math.random() * quotes.length));

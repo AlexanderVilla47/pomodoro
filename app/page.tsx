@@ -14,6 +14,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { requestNotificationPermission } from "@/lib/notifications";
 import type { Settings } from "@/lib/db/queries/settings";
 import { UserBadge } from "@/components/UserBadge";
+import { InstallButton } from "@/components/InstallButton";
 
 type MobileTab = "timer" | "music" | "stats";
 
@@ -92,6 +93,8 @@ function AppContent() {
           <div className="shrink-0 flex items-center gap-8 pt-4 pb-0">
             <div className="flex-1 flex items-center justify-between">
               <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={handleLabelChange} />
+              <div className="flex items-center gap-2">
+              <InstallButton />
               <div className="relative">
                 <button
                   onClick={() => setSettingsOpen((o) => !o)}
@@ -108,6 +111,7 @@ function AppContent() {
                     <SettingsPanel settings={settings} onSave={settingsPatch} />
                   </div>
                 )}
+              </div>
               </div>
             </div>
             <div className="w-[440px] shrink-0">
@@ -141,6 +145,7 @@ function AppContent() {
           <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-white/5">
             <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={handleLabelChange} />
             <div className="flex-1" />
+            <InstallButton className="w-8 h-8 flex items-center justify-center" />
             <div className="relative">
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
