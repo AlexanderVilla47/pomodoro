@@ -84,7 +84,7 @@ function AppContent() {
         <div id="yt-player" />
       </div>
 
-      <div className="h-dvh overflow-hidden bg-[var(--color-bg)] text-white" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="h-dvh overflow-hidden bg-[var(--color-bg)] text-white">
 
         {/* ── Desktop ── */}
         <div className="hidden md:flex flex-col h-full max-w-6xl mx-auto px-4">
@@ -142,7 +142,7 @@ function AppContent() {
         <div className="flex flex-col h-full md:hidden">
 
           {/* Header */}
-          <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-white/5">
+          <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-white/5" style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}>
             <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={handleLabelChange} />
             <div className="flex-1" />
             <InstallButton className="w-8 h-8 flex items-center justify-center" />
