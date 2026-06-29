@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import withPWA from "@ducanh2912/next-pwa";
+import withSerwist from "@serwist/next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["postgres", "pg", "better-auth"],
@@ -13,7 +13,8 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA({
-  dest: "public",
+export default withSerwist({
+  swSrc: "sw.ts",
+  swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
 })(nextConfig);
