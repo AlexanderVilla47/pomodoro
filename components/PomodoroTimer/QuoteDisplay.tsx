@@ -85,18 +85,9 @@ export const QuoteDisplay = memo(function QuoteDisplay({ phase, status }: QuoteD
         <p className="text-sm italic text-white/50 leading-relaxed">
           &ldquo;{quote.text}&rdquo;
         </p>
-        <div className="mt-1.5 flex items-center justify-center gap-2">
-          <span className="text-[11px] tracking-wide text-white/25">
-            — {quote.author}
-          </span>
-          <button
-            onClick={nextQuote}
-            title="Otra frase"
-            className="text-white/20 hover:text-white/50 transition-colors duration-200 leading-none"
-          >
-            ↺
-          </button>
-        </div>
+        <span className="mt-1.5 block text-[11px] tracking-wide text-white/25">
+          — {quote.author}
+        </span>
       </div>
     </div>
   );
