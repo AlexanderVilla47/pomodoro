@@ -26,6 +26,16 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
+      <head>
+        {/* Capture beforeinstallprompt before React hydrates */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          window.__pwa_prompt = null;
+          window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window.__pwa_prompt = e;
+          });
+        `}} />
+      </head>
       <body>
         <SettingsProvider>{children}</SettingsProvider>
       </body>
