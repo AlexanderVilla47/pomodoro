@@ -3,8 +3,21 @@ import "./globals.css";
 import { SettingsProvider } from "@/context/SettingsContext";
 
 export const metadata: Metadata = {
-  title: "Pomodoro",
-  description: "Timer de estudio con música y tracking diario",
+  title: "Pomy",
+  description: "Timer de enfoque con música y tracking diario",
+  manifest: "/site.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Pomy",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

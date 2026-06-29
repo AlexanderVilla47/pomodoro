@@ -41,3 +41,9 @@ tsconfig.tsbuildinfo
 
 # SDD (artefactos de planeamiento, no van al repo)
 .atl/
+
+# PWA (generados en build, no van al repo)
+public/sw.js
+public/workbox-*.js
+public/sw.js.map
+public/workbox-*.js.map
