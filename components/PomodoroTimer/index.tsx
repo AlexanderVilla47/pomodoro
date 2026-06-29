@@ -8,6 +8,7 @@ import { TimerRing } from "./TimerRing";
 import { TimerLabel } from "./TimerLabel";
 import { SessionProgress } from "./SessionProgress";
 import { TimerControls } from "./TimerControls";
+import { QuoteDisplay } from "./QuoteDisplay";
 
 interface PomodoroTimerProps {
   labelColor?: string;
@@ -99,6 +100,7 @@ export function PomodoroTimer({ labelColor }: PomodoroTimerProps) {
         onStop={stop}
         onSkip={skip}
       />
+      <QuoteDisplay phase={phase} status={status} />
     </div>
   );
 }
