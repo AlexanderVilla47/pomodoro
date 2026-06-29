@@ -35,7 +35,7 @@ export function LabelSelector({ selectedId, onChange }: Props) {
   const fetchLabels = useCallback(() => {
     fetch("/api/labels")
       .then((r) => r.json())
-      .then(setLabels)
+      .then((data) => { if (Array.isArray(data)) setLabels(data); })
       .catch(console.error);
   }, []);
 

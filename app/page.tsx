@@ -84,7 +84,7 @@ function AppContent() {
         <div id="yt-player" />
       </div>
 
-      <div className="h-dvh overflow-hidden bg-[var(--color-bg)] text-white">
+      <div className="h-dvh overflow-hidden bg-[var(--color-bg)] text-white" style={{ paddingTop: "env(safe-area-inset-top)" }}>
 
         {/* ── Desktop ── */}
         <div className="hidden md:flex flex-col h-full max-w-6xl mx-auto px-4">
