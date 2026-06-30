@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const DAY_LABELS = ["", "Lun", "", "Mié", "", "Vie", ""];
@@ -73,9 +73,16 @@ function getMonthLabels(weeks: Cell[][]): { name: string; col: number }[] {
   return labels;
 }
 
-interface Props { initialYear?: number; onDateClick?: (date: string) => void; selectedDate?: string | null; cellSize?: number; }
+interface Props {
+  initialYear?: number;
+  onDateClick?: (date: string) => void;
+  selectedDate?: string | null;
+  cellSize?: number;
+  confirmTap?: boolean;
+  onPendingChange?: (date: string | null, label: string | null) => void;
+}
 
-export function ContributionGraph({ initialYear, onDateClick, selectedDate, cellSize: cellSizeProp }: Props) {
+export function ContributionGraph({ initialYear, onDateClick, selectedDate, cellSize: cellSizeProp, confirmTap, onPendingChange }: Props) {
   const cell = cellSizeProp ?? CELL;
   const dayColW = Math.round(DAY_COL_W * cell / CELL);
   const currentYear = new Date().getFullYear();
@@ -84,6 +91,23 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate, cell
   const [years, setYears] = useState<number[]>([currentYear]);
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
+
+  const handleCellClick = useCallback((day: Cell) => {
+    if (!day.inYear || !onDateClick) return;
+    if (confirmTap) {
+      if (pendingDate === day.date) {
+        onDateClick(day.date);
+        setPendingDate(null);
+        onPendingChange?.(null, null);
+      } else {
+        setPendingDate(day.date);
+        onPendingChange?.(day.date, fmtDate(day.date));
+      }
+    } else {
+      onDateClick(day.date);
+    }
+  }, [confirmTap, pendingDate, onDateClick, onPendingChange]);
 
   useEffect(() => {
     const tz = -new Date().getTimezoneOffset();
@@ -172,10 +196,14 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate, cell
                         borderRadius: Math.round(cell / 5),
                         backgroundColor: day.inYear ? getColor(day.seconds) : "transparent",
                         cursor: day.inYear ? "pointer" : "default",
-                        outline: selectedDate === day.date ? "2px solid rgba(255,255,255,0.6)" : undefined,
+                        outline: selectedDate === day.date
+                          ? "2px solid rgba(255,255,255,0.7)"
+                          : pendingDate === day.date
+                          ? "2px solid rgba(255,255,255,0.35)"
+                          : undefined,
                         outlineOffset: 1,
                       }}
-                      onClick={day.inYear && onDateClick ? () => onDateClick(day.date) : undefined}
+                      onClick={day.inYear ? () => handleCellClick(day) : undefined}
                       onMouseEnter={
                         day.inYear
                           ? (e) => {

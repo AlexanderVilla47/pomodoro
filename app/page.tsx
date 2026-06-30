@@ -258,6 +258,7 @@ function AppContent() {
                 refreshTrigger={historyVersion}
                 onViewChange={setMobileHistorialView}
                 cellSize={16}
+                confirmTap
               />
             </div>
           </div>

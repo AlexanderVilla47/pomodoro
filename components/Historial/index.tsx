@@ -9,6 +9,7 @@ interface HistorialProps {
   refreshTrigger: number;
   onViewChange?: (view: "calendar" | "day") => void;
   cellSize?: number;
+  confirmTap?: boolean;
 }
 
 function formatTime(isoString: string): string {
@@ -30,11 +31,12 @@ function getTzOffset(): number {
   return -new Date().getTimezoneOffset();
 }
 
-export function Historial({ refreshTrigger, onViewChange, cellSize }: HistorialProps) {
+export function Historial({ refreshTrigger, onViewChange, cellSize, confirmTap }: HistorialProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dayLogs, setDayLogs] = useState<WorkLogRow[]>([]);
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
 
   const fetchByDate = useCallback(async (date: string) => {
     setDayLoading(true);
@@ -174,9 +176,15 @@ export function Historial({ refreshTrigger, onViewChange, cellSize }: HistorialP
   // ── Vista: calendario ──
   return (
     <div className="h-full flex flex-col gap-2 p-3 rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
-      <ContributionGraph onDateClick={handleDateClick} selectedDate={selectedDate} cellSize={cellSize} />
-      <p className="text-[10px] text-white/25 text-center">
-        Tocá una fecha para ver las sesiones
+      <ContributionGraph
+        onDateClick={handleDateClick}
+        selectedDate={selectedDate}
+        cellSize={cellSize}
+        confirmTap={confirmTap}
+        onPendingChange={(_date, label) => setPendingLabel(label)}
+      />
+      <p className="text-[10px] text-center transition-colors" style={{ color: pendingLabel ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)" }}>
+        {pendingLabel ? `${pendingLabel} — tocá de nuevo para abrir` : confirmTap ? "Tocá dos veces una fecha para ver las sesiones" : "Tocá una fecha para ver las sesiones"}
       </p>
     </div>
   );
