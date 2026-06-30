@@ -7,6 +7,7 @@ import type { WorkLogRow } from "@/lib/db/queries/work-logs";
 
 interface HistorialProps {
   refreshTrigger: number;
+  onViewChange?: (view: "calendar" | "day") => void;
 }
 
 function formatTime(isoString: string): string {
@@ -28,7 +29,7 @@ function getTzOffset(): number {
   return -new Date().getTimezoneOffset();
 }
 
-export function Historial({ refreshTrigger }: HistorialProps) {
+export function Historial({ refreshTrigger, onViewChange }: HistorialProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dayLogs, setDayLogs] = useState<WorkLogRow[]>([]);
   const [dayLoading, setDayLoading] = useState(false);
@@ -54,16 +55,20 @@ export function Historial({ refreshTrigger }: HistorialProps) {
   const handleDateClick = useCallback((date: string) => {
     setSelectedDate(date);
     fetchByDate(date);
-  }, [fetchByDate]);
+    onViewChange?.("day");
+  }, [fetchByDate, onViewChange]);
 
   const handleBack = useCallback(() => {
     setSelectedDate(null);
     setDayLogs([]);
-  }, []);
+    onViewChange?.("calendar");
+  }, [onViewChange]);
 
   useEffect(() => {
     setSelectedDate(null);
     setDayLogs([]);
+    onViewChange?.("calendar");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]);
 
   // ── Vista: sesiones del día ──

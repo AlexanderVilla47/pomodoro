@@ -20,7 +20,7 @@ import { JournalPrompt } from "@/components/JournalPrompt";
 import { JournalBridge } from "@/components/JournalPrompt/JournalBridge";
 import { Historial } from "@/components/Historial";
 
-type MobileTab = "timer" | "music" | "stats" | "history";
+type MobileTab = "timer" | "music" | "history";
 type DesktopRightTab = "stats" | "history";
 
 function hexToRgb(hex: string): string {
@@ -47,6 +47,7 @@ function AppContent() {
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("timer");
   const [desktopRightTab, setDesktopRightTab] = useState<DesktopRightTab>("stats");
+  const [mobileHistorialView, setMobileHistorialView] = useState<"calendar" | "day">("calendar");
   const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
 
   const { saveWorkLog } = useWorkLogger();
@@ -249,12 +250,14 @@ function AppContent() {
               <MusicPanel />
             </div>
 
-            <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTab === "stats" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-              <Dashboard refreshTrigger={statsVersion} />
-            </div>
-
-            <div className={`absolute inset-0 overflow-y-auto p-4 transition-opacity duration-150 ${mobileTab === "history" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-              <Historial refreshTrigger={historyVersion} />
+            <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTab === "history" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              {mobileHistorialView === "calendar" && (
+                <Dashboard refreshTrigger={statsVersion} />
+              )}
+              <Historial
+                refreshTrigger={historyVersion}
+                onViewChange={setMobileHistorialView}
+              />
             </div>
           </div>
 
@@ -281,17 +284,6 @@ function AppContent() {
                       <circle cx="12" cy="13" r="8" />
                       <path d="M12 9v4l2.5 2.5" />
                       <path d="M9.5 3h5" />
-                    </svg>
-                  ),
-                },
-                {
-                  tab: "stats",
-                  label: "Estadísticas",
-                  icon: (
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                      <rect x="3" y="13" width="4" height="8" rx="1" />
-                      <rect x="10" y="8" width="4" height="13" rx="1" />
-                      <rect x="17" y="4" width="4" height="17" rx="1" />
                     </svg>
                   ),
                 },
