@@ -65,7 +65,7 @@ export async function getStatsForWeek(sql: Sql, userId: string, tzOffsetMinutes:
     WHERE user_id = ${userId}
       AND type = 'work'
       AND (started_at + make_interval(mins => ${tzOffsetMinutes}))::date
-          >= (NOW() + make_interval(mins => ${tzOffsetMinutes}) - interval '6 days')::date
+          >= (date_trunc('week', (NOW() + make_interval(mins => ${tzOffsetMinutes}))::date + interval '1 day') - interval '1 day')::date
   `;
   return { count: Number(row.count), total_seconds: Number(row.total_seconds) };
 }
