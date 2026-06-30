@@ -40,7 +40,7 @@ export function TimerProvider({
 }: {
   children: React.ReactNode;
   settings: Settings;
-  onSessionLogged?: () => void;
+  onSessionLogged?: (sessionId: number | null) => void;
   selectedLabelId?: number | null;
 }) {
   const [machine, setMachine] = useState<MachineState>({
@@ -65,8 +65,8 @@ export function TimerProvider({
   const selectedLabelIdRef = useRef(selectedLabelId);
   selectedLabelIdRef.current = selectedLabelId;
 
-  const { logSession } = useSessionLogger(() => {
-    onSessionLoggedRef.current?.();
+  const { logSession } = useSessionLogger((id) => {
+    onSessionLoggedRef.current?.(id);
   });
 
   const doLog = useCallback(

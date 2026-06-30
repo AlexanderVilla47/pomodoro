@@ -60,7 +60,7 @@ describe("useSessionLogger", () => {
     expect(onLogged).toHaveBeenCalledTimes(1);
   });
 
-  it("no llama onLogged cuando el servidor retorna 204 (sesión ignorada)", async () => {
+  it("llama onLogged con null cuando el servidor retorna 204 (sesión ignorada)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => null })
@@ -80,7 +80,7 @@ describe("useSessionLogger", () => {
       });
     });
 
-    expect(onLogged).not.toHaveBeenCalled();
+    expect(onLogged).toHaveBeenCalledWith(null);
   });
 
   it("maneja errores silenciosamente (no lanza)", async () => {

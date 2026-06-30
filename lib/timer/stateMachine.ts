@@ -47,7 +47,7 @@ export function transition(state: MachineState, action: TimerAction): MachineSta
 
     case "STOP": {
       if (status === "running" || status === "paused") {
-        return { status: "idle", phase, sessionCount };
+        return { status: "idle", phase: "work", sessionCount };
       }
       return state;
     }

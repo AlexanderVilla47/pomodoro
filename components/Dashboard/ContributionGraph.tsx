@@ -12,10 +12,10 @@ const DAY_COL_W = 22;
 function getColor(seconds: number): string {
   if (seconds === 0) return "rgba(255,255,255,0.07)";
   const m = seconds / 60;
-  if (m < 30)  return "rgba(90,191,168,0.25)";
-  if (m < 60)  return "rgba(90,191,168,0.50)";
-  if (m < 120) return "rgba(90,191,168,0.75)";
-  return "#5ABFA8";
+  if (m < 30)  return "rgba(255,255,255,0.28)";
+  if (m < 60)  return "rgba(255,255,255,0.52)";
+  if (m < 120) return "rgba(255,255,255,0.76)";
+  return "rgba(255,255,255,0.95)";
 }
 
 function fmtDuration(s: number): string {
@@ -73,9 +73,9 @@ function getMonthLabels(weeks: Cell[][]): { name: string; col: number }[] {
   return labels;
 }
 
-interface Props { initialYear?: number; }
+interface Props { initialYear?: number; onDateClick?: (date: string) => void; selectedDate?: string | null; }
 
-export function ContributionGraph({ initialYear }: Props) {
+export function ContributionGraph({ initialYear, onDateClick, selectedDate }: Props) {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(initialYear ?? currentYear);
   const [weeks, setWeeks] = useState<Cell[][]>([]);
@@ -170,7 +170,10 @@ export function ContributionGraph({ initialYear }: Props) {
                         borderRadius: 2,
                         backgroundColor: day.inYear ? getColor(day.seconds) : "transparent",
                         cursor: day.inYear ? "pointer" : "default",
+                        outline: selectedDate === day.date ? "2px solid rgba(255,255,255,0.6)" : undefined,
+                        outlineOffset: 1,
                       }}
+                      onClick={day.inYear && onDateClick ? () => onDateClick(day.date) : undefined}
                       onMouseEnter={
                         day.inYear
                           ? (e) => {

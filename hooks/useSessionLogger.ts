@@ -27,16 +27,21 @@ function saveQueue(queue: SessionPayload[]) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
-async function sendSession(data: SessionPayload): Promise<boolean> {
+async function sendSession(data: SessionPayload): Promise<number | null> {
   const res = await fetch("/api/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  return res.status === 201 || res.status === 204;
+  if (res.status === 201) {
+    const { id } = await res.json();
+    return id as number;
+  }
+  if (res.status === 204) return null;
+  throw new Error(`Unexpected status: ${res.status}`);
 }
 
-export function useSessionLogger(onLogged: () => void) {
+export function useSessionLogger(onLogged: (sessionId: number | null) => void) {
   const flushQueue = useCallback(async () => {
     const queue = getQueue();
     if (queue.length === 0) return;
@@ -44,9 +49,8 @@ export function useSessionLogger(onLogged: () => void) {
     const failed: SessionPayload[] = [];
     for (const session of queue) {
       try {
-        const ok = await sendSession(session);
-        if (ok) onLogged();
-        else failed.push(session);
+        const id = await sendSession(session);
+        onLogged(id);
       } catch {
         failed.push(session);
       }
@@ -54,7 +58,6 @@ export function useSessionLogger(onLogged: () => void) {
     saveQueue(failed);
   }, [onLogged]);
 
-  // Flush pending sessions on mount and whenever connection is restored
   useEffect(() => {
     flushQueue();
     window.addEventListener("online", flushQueue);
@@ -64,10 +67,9 @@ export function useSessionLogger(onLogged: () => void) {
   const logSession = useCallback(
     async (data: SessionPayload) => {
       try {
-        const ok = await sendSession(data);
-        if (ok) onLogged();
+        const id = await sendSession(data);
+        onLogged(id);
       } catch {
-        // Offline — queue for later sync
         const queue = getQueue();
         queue.push(data);
         saveQueue(queue);

@@ -11,12 +11,17 @@ import { Confetti } from "@/components/Confetti";
 import { LabelSelector } from "@/components/LabelSelector";
 import type { Label } from "@/components/LabelSelector";
 import { useSettings } from "@/hooks/useSettings";
+import { useWorkLogger } from "@/hooks/useWorkLogger";
 import { requestNotificationPermission } from "@/lib/notifications";
 import type { Settings } from "@/lib/db/queries/settings";
 import { UserBadge } from "@/components/UserBadge";
 import { InstallButton } from "@/components/InstallButton";
+import { JournalPrompt } from "@/components/JournalPrompt";
+import { JournalBridge } from "@/components/JournalPrompt/JournalBridge";
+import { Historial } from "@/components/Historial";
 
-type MobileTab = "timer" | "music" | "stats";
+type MobileTab = "timer" | "music" | "stats" | "history";
+type DesktopRightTab = "stats" | "history";
 
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -25,13 +30,26 @@ function hexToRgb(hex: string): string {
   return `${r} ${g} ${b}`;
 }
 
+function tabCls(active: boolean) {
+  return `flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${
+    active
+      ? "bg-white/10 text-white"
+      : "text-white/30 hover:text-white/60"
+  }`;
+}
+
 function AppContent() {
   const { settings, updateSettings } = useSettings();
   const [statsVersion, setStatsVersion] = useState(0);
+  const [historyVersion, setHistoryVersion] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("timer");
+  const [desktopRightTab, setDesktopRightTab] = useState<DesktopRightTab>("stats");
+  const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
+
+  const { saveWorkLog } = useWorkLogger();
 
   useEffect(() => {
     try {
@@ -40,10 +58,23 @@ function AppContent() {
     } catch {}
   }, []);
 
-  const handleSessionComplete = useCallback(() => {
+  const handleSessionComplete = useCallback((sessionId: number | null) => {
     setStatsVersion((v) => v + 1);
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 1200);
+    if (sessionId !== null) setPendingSessionId(sessionId);
+  }, []);
+
+  const handleJournalClose = useCallback(() => {
+    if (pendingSessionId !== null) {
+      saveWorkLog({ sessionId: pendingSessionId, notes: null, topics: [] }).catch(() => {});
+    }
+    setPendingSessionId(null);
+  }, [pendingSessionId, saveWorkLog]);
+
+  const handleJournalSaved = useCallback(() => {
+    setPendingSessionId(null);
+    setHistoryVersion((v) => v + 1);
   }, []);
 
   useEffect(() => {
@@ -79,6 +110,9 @@ function AppContent() {
       onSessionLogged={handleSessionComplete}
       selectedLabelId={selectedLabel?.id ?? null}
     >
+      {/* Auto-dismiss journal prompt when a new work session starts */}
+      <JournalBridge onWorkStart={handleJournalClose} />
+
       {/* Single permanent yt-player anchor — always in DOM with real dimensions */}
       <div aria-hidden="true" style={{ position: "fixed", top: 0, left: 0, width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none", zIndex: -1 }}>
         <div id="yt-player" />
@@ -89,7 +123,7 @@ function AppContent() {
         {/* ── Desktop ── */}
         <div className="hidden md:flex flex-col h-full max-w-6xl mx-auto px-4">
 
-          {/* Top bar — mirrors the same gap-8 column split so gear aligns flush with timer edge */}
+          {/* Top bar */}
           <div className="shrink-0 flex items-center gap-8 pt-4 pb-0">
             <div className="flex-1 flex items-center justify-between">
               <LabelSelector selectedId={selectedLabel?.id ?? null} onChange={handleLabelChange} />
@@ -121,14 +155,51 @@ function AppContent() {
 
           {/* Main content */}
           <div className="flex flex-1 gap-8 min-h-0 pb-6">
+            {/* Timer — overlay flotante cuando hay sesión pendiente */}
             <div className="flex-1 flex flex-col items-center justify-center relative">
               <Confetti trigger={showConfetti} />
               <PomodoroTimer labelColor={selectedLabel?.color} />
+
+              {/* Journal overlay sobre el timer */}
+              {pendingSessionId !== null && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 backdrop-blur-md rounded-2xl">
+                  <div className="w-full max-w-sm mx-4">
+                    <JournalPrompt
+                      sessionId={pendingSessionId}
+                      variant="desktop"
+                      onClose={handleJournalClose}
+                      onSaved={handleJournalSaved}
+                      saveWorkLog={saveWorkLog}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Right panel — siempre muestra stats/historial */}
             <div className="w-[440px] shrink-0 flex flex-col gap-3 pt-3 pb-6 overflow-hidden">
-              <div className="shrink-0">
-                <Dashboard refreshTrigger={statsVersion} />
+              <div className="flex flex-col gap-2 max-h-[45%] overflow-hidden shrink-0">
+                <div className="shrink-0 flex gap-1 p-1 bg-white/5 rounded-xl">
+                  <button
+                    onClick={() => setDesktopRightTab("stats")}
+                    className={tabCls(desktopRightTab === "stats")}
+                  >
+                    Estadísticas
+                  </button>
+                  <button
+                    onClick={() => setDesktopRightTab("history")}
+                    className={tabCls(desktopRightTab === "history")}
+                  >
+                    Historial
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  {desktopRightTab === "stats" ? (
+                    <Dashboard refreshTrigger={statsVersion} />
+                  ) : (
+                    <Historial refreshTrigger={historyVersion} />
+                  )}
+                </div>
               </div>
               <div className="flex-1 min-h-0">
                 <MusicPanel />
@@ -166,7 +237,7 @@ function AppContent() {
             <UserBadge compact />
           </div>
 
-          {/* Content — panels stacked with absolute positioning so YouTube player always has real dimensions */}
+          {/* Content */}
           <div className="flex-1 min-h-0 overflow-hidden relative">
             <Confetti trigger={showConfetti} />
 
@@ -180,6 +251,10 @@ function AppContent() {
 
             <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTab === "stats" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <Dashboard refreshTrigger={statsVersion} />
+            </div>
+
+            <div className={`absolute inset-0 overflow-y-auto p-4 transition-opacity duration-150 ${mobileTab === "history" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              <Historial refreshTrigger={historyVersion} />
             </div>
           </div>
 
@@ -220,6 +295,18 @@ function AppContent() {
                     </svg>
                   ),
                 },
+                {
+                  tab: "history",
+                  label: "Historial",
+                  icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                  ),
+                },
               ] as const
             ).map(({ tab, icon, label }) => (
               <button
@@ -234,6 +321,15 @@ function AppContent() {
               </button>
             ))}
           </div>
+
+          {/* Mobile journal prompt — fixed overlay, outside tab panels */}
+          <JournalPrompt
+            sessionId={pendingSessionId}
+            variant="mobile"
+            onClose={handleJournalClose}
+            onSaved={handleJournalSaved}
+            saveWorkLog={saveWorkLog}
+          />
 
         </div>
 

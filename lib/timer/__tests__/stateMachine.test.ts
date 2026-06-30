@@ -52,6 +52,14 @@ describe("transition — transiciones válidas", () => {
     expect(next.status).toBe("idle");
   });
 
+  it("STOP durante un descanso vuelve a phase work", () => {
+    const inBreak: MachineState = { status: "running", phase: "short_break", sessionCount: 1 };
+    const next = transition(inBreak, "STOP");
+    expect(next.status).toBe("idle");
+    expect(next.phase).toBe("work");
+    expect(next.sessionCount).toBe(1);
+  });
+
   it("RESET desde cualquier estado vuelve a idle con sessionCount=0", () => {
     const running = transition(idle, "START");
     const next = transition(running, "RESET");

@@ -73,4 +73,21 @@ export async function runMigrations(sql: Sql): Promise<void> {
       expires_at TIMESTAMPTZ NOT NULL
     )
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS work_logs (
+      id          SERIAL PRIMARY KEY,
+      session_id  INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      user_id     TEXT NOT NULL,
+      notes       TEXT,
+      topics      TEXT[] NOT NULL DEFAULT '{}',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (session_id)
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS work_logs_user_id_created_at_idx
+      ON work_logs (user_id, created_at DESC)
+  `;
 }

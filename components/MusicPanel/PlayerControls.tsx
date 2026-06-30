@@ -79,25 +79,47 @@ export function PlayerControls({
     "inline-flex items-center justify-center p-2 rounded-full transition-all disabled:opacity-30 hover:bg-white/10 active:scale-95 text-white/70 hover:text-white";
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-center gap-4">
-        <button onClick={onPrev} disabled={!isReady} aria-label="Anterior" className={btn}>
-          <IconPrev />
-        </button>
-        <button
-          onClick={isPlaying ? onPause : onPlay}
-          disabled={!isReady}
-          aria-label={isPlaying ? "Pausar" : "Reproducir"}
-          className={`${btn} w-10 h-10 bg-mint/20 hover:bg-mint/30 !text-mint`}
-        >
-          {isPlaying ? <IconPause /> : <IconPlay />}
-        </button>
-        <button onClick={onNext} disabled={!isReady} aria-label="Siguiente" className={btn}>
-          <IconNext />
-        </button>
+    <div className="flex flex-col gap-2">
+      {/* Controls + volume on same row */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
+          <button onClick={onPrev} disabled={!isReady} aria-label="Anterior" className={btn}>
+            <IconPrev />
+          </button>
+          <button
+            onClick={isPlaying ? onPause : onPlay}
+            disabled={!isReady}
+            aria-label={isPlaying ? "Pausar" : "Reproducir"}
+            className={`${btn} w-9 h-9 bg-mint/20 hover:bg-mint/30 !text-mint`}
+          >
+            {isPlaying ? <IconPause /> : <IconPlay />}
+          </button>
+          <button onClick={onNext} disabled={!isReady} aria-label="Siguiente" className={btn}>
+            <IconNext />
+          </button>
+        </div>
+
+        {/* Volume — takes remaining space */}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span className="text-white/40 shrink-0">
+            {volume === 0 ? <IconVolumeMute /> : volume < 50 ? <IconVolumeLow /> : <IconVolumeHigh />}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={volume}
+            onChange={(e) => onVolumeChange(Number(e.target.value))}
+            aria-label="Volumen"
+            className="flex-1 min-w-0"
+            style={{ "--fill-pct": `${volume}%` } as React.CSSProperties}
+          />
+          <span className="text-[10px] text-white/30 w-6 text-right shrink-0">{volume}</span>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-1">
+      {/* Progress bar */}
+      <div className="flex flex-col gap-0.5">
         <input
           type="range"
           min={0}
@@ -106,28 +128,13 @@ export function PlayerControls({
           onChange={(e) => onSeek(Number(e.target.value))}
           disabled={!isReady || duration === 0}
           aria-label="Progreso de canción"
-          className="w-full accent-mint disabled:opacity-30"
+          className="w-full"
+          style={{ "--fill-pct": duration > 0 ? `${((currentTime / duration) * 100).toFixed(1)}%` : "0%" } as React.CSSProperties}
         />
-        <div className="flex justify-between text-xs text-white/40 px-0.5">
+        <div className="flex justify-between text-[10px] text-white/40 px-0.5">
           <span>{fmt(currentTime)}</span>
           <span>{fmt(duration)}</span>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="text-white/50">
-          {volume === 0 ? <IconVolumeMute /> : volume < 50 ? <IconVolumeLow /> : <IconVolumeHigh />}
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={volume}
-          onChange={(e) => onVolumeChange(Number(e.target.value))}
-          aria-label="Volumen"
-          className="flex-1 accent-mint"
-        />
-        <span className="text-xs text-white/40 w-7 text-right">{volume}</span>
       </div>
     </div>
   );
