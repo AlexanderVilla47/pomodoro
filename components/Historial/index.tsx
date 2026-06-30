@@ -175,7 +175,7 @@ export function Historial({ refreshTrigger, onViewChange, cellSize, confirmTap }
 
   // ── Vista: calendario ──
   return (
-    <div className="h-full flex flex-col gap-2 p-3 rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
+    <div className="flex flex-col gap-2 p-3 rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
       <ContributionGraph
         onDateClick={handleDateClick}
         selectedDate={selectedDate}
@@ -183,7 +183,7 @@ export function Historial({ refreshTrigger, onViewChange, cellSize, confirmTap }
         confirmTap={confirmTap}
         onPendingChange={(_date, label) => setPendingLabel(label)}
       />
-      <p className="text-[10px] text-center transition-colors" style={{ color: pendingLabel ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)" }}>
+      <p className="text-[10px] text-center transition-colors mt-2" style={{ color: pendingLabel ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)" }}>
         {pendingLabel ? `${pendingLabel} — tocá de nuevo para abrir` : confirmTap ? "Tocá dos veces una fecha para ver las sesiones" : "Tocá una fecha para ver las sesiones"}
       </p>
     </div>
