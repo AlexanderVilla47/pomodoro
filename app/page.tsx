@@ -257,6 +257,7 @@ function AppContent() {
               <Historial
                 refreshTrigger={historyVersion}
                 onViewChange={setMobileHistorialView}
+                cellSize={16}
               />
             </div>
           </div>

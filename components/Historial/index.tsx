@@ -8,6 +8,7 @@ import type { WorkLogRow } from "@/lib/db/queries/work-logs";
 interface HistorialProps {
   refreshTrigger: number;
   onViewChange?: (view: "calendar" | "day") => void;
+  cellSize?: number;
 }
 
 function formatTime(isoString: string): string {
@@ -29,7 +30,7 @@ function getTzOffset(): number {
   return -new Date().getTimezoneOffset();
 }
 
-export function Historial({ refreshTrigger, onViewChange }: HistorialProps) {
+export function Historial({ refreshTrigger, onViewChange, cellSize }: HistorialProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dayLogs, setDayLogs] = useState<WorkLogRow[]>([]);
   const [dayLoading, setDayLoading] = useState(false);
@@ -173,7 +174,7 @@ export function Historial({ refreshTrigger, onViewChange }: HistorialProps) {
   // ── Vista: calendario ──
   return (
     <div className="h-full flex flex-col gap-2 p-3 rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
-      <ContributionGraph onDateClick={handleDateClick} selectedDate={selectedDate} />
+      <ContributionGraph onDateClick={handleDateClick} selectedDate={selectedDate} cellSize={cellSize} />
       <p className="text-[10px] text-white/25 text-center">
         Tocá una fecha para ver las sesiones
       </p>

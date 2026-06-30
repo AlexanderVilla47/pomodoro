@@ -73,9 +73,11 @@ function getMonthLabels(weeks: Cell[][]): { name: string; col: number }[] {
   return labels;
 }
 
-interface Props { initialYear?: number; onDateClick?: (date: string) => void; selectedDate?: string | null; }
+interface Props { initialYear?: number; onDateClick?: (date: string) => void; selectedDate?: string | null; cellSize?: number; }
 
-export function ContributionGraph({ initialYear, onDateClick, selectedDate }: Props) {
+export function ContributionGraph({ initialYear, onDateClick, selectedDate, cellSize: cellSizeProp }: Props) {
+  const cell = cellSizeProp ?? CELL;
+  const dayColW = Math.round(DAY_COL_W * cell / CELL);
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(initialYear ?? currentYear);
   const [weeks, setWeeks] = useState<Cell[][]>([]);
@@ -101,13 +103,13 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate }: Pr
     const today = new Date().toISOString().slice(0, 10);
     const todayCol = weeks.findIndex((week) => week.some((d) => d.date === today));
     if (todayCol === -1) return;
-    const colPos = DAY_COL_W + todayCol * (CELL + GAP);
+    const colPos = dayColW + todayCol * (cell + GAP);
     const half = scrollRef.current.clientWidth / 2;
-    scrollRef.current.scrollLeft = Math.max(0, colPos - half + CELL / 2);
-  }, [weeks]);
+    scrollRef.current.scrollLeft = Math.max(0, colPos - half + cell / 2);
+  }, [weeks, cell, dayColW]);
 
   const monthLabels = getMonthLabels(weeks);
-  const gridW = weeks.length * (CELL + GAP) - GAP;
+  const gridW = weeks.length * (cell + GAP) - GAP;
 
   return (
     <div className="flex flex-col gap-2 select-none">
@@ -128,14 +130,14 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate }: Pr
 
       {/* Gráfico — scroll horizontal sin barra visible */}
       <div ref={scrollRef} className="overflow-x-auto no-scrollbar">
-        <div style={{ width: DAY_COL_W + gridW }}>
+        <div style={{ width: dayColW + gridW }}>
 
           {/* Etiquetas de meses */}
-          <div style={{ position: "relative", height: 14, marginLeft: DAY_COL_W }}>
+          <div style={{ position: "relative", height: 14, marginLeft: dayColW }}>
             {monthLabels.map(({ name, col }) => (
               <span
                 key={name + col}
-                style={{ position: "absolute", left: col * (CELL + GAP), fontSize: 10, color: "rgba(255,255,255,0.3)" }}
+                style={{ position: "absolute", left: col * (cell + GAP), fontSize: 10, color: "rgba(255,255,255,0.3)" }}
               >
                 {name}
               </span>
@@ -146,11 +148,11 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate }: Pr
           <div style={{ display: "flex", gap: 0 }}>
 
             {/* Días (Lun, Mié, Vie) */}
-            <div style={{ display: "flex", flexDirection: "column", gap: GAP, width: DAY_COL_W }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: GAP, width: dayColW }}>
               {DAY_LABELS.map((label, i) => (
                 <div
                   key={i}
-                  style={{ height: CELL, fontSize: 9, color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center" }}
+                  style={{ height: cell, fontSize: 9, color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center" }}
                 >
                   {label}
                 </div>
@@ -165,9 +167,9 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate }: Pr
                     <div
                       key={di}
                       style={{
-                        width: CELL,
-                        height: CELL,
-                        borderRadius: 2,
+                        width: cell,
+                        height: cell,
+                        borderRadius: Math.round(cell / 5),
                         backgroundColor: day.inYear ? getColor(day.seconds) : "transparent",
                         cursor: day.inYear ? "pointer" : "default",
                         outline: selectedDate === day.date ? "2px solid rgba(255,255,255,0.6)" : undefined,
@@ -180,7 +182,7 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate }: Pr
                               const r = e.currentTarget.getBoundingClientRect();
                               setTooltip({
                                 text: `${fmtDate(day.date)} — ${fmtDuration(day.seconds)}`,
-                                x: r.left + CELL / 2,
+                                x: r.left + cell / 2,
                                 y: r.top,
                               });
                             }
