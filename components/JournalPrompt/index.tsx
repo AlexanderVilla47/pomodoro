@@ -219,7 +219,7 @@ function JournalContent({
               <input
                 type="text"
                 className="flex-1 min-w-[80px] bg-transparent text-[11px] text-white/80 placeholder:text-white/25 focus:outline-none"
-                placeholder={topics.length === 0 ? "Tema: ej. Unidad 1, Sesión de trabajo..." : ""}
+                placeholder={topics.length === 0 ? "Título: ej. Unidad 1, Sesión de trabajo..." : ""}
                 value={chipDraft}
                 onChange={handleChipChange}
                 onKeyDown={handleChipKeyDown}
