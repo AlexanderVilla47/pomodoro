@@ -111,4 +111,12 @@ export async function runMigrations(sql: Sql): Promise<void> {
     CREATE INDEX IF NOT EXISTS friendships_requester_id_idx
       ON friendships (requester_id, status)
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS presence (
+      user_id    TEXT PRIMARY KEY,
+      phase      TEXT NOT NULL DEFAULT 'idle' CHECK (phase IN ('work', 'break', 'idle')),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
 }

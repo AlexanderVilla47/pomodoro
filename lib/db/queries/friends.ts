@@ -2,6 +2,8 @@ import type postgres from "postgres";
 
 type Sql = ReturnType<typeof postgres>;
 
+export type FriendPresence = "working" | "break" | "online" | "offline";
+
 export interface FriendUser {
   friendshipId: number;
   userId: string;
@@ -9,6 +11,7 @@ export interface FriendUser {
   image: string | null;
   todaySeconds: number;
   weekSeconds: number;
+  presence: FriendPresence;
 }
 
 export interface PendingRequest {
@@ -92,6 +95,7 @@ export async function getFriendsWithStats(
       image: string | null;
       today_seconds: number;
       week_seconds: number;
+      presence: FriendPresence;
     }>
   >`
     SELECT
@@ -119,13 +123,20 @@ export async function getFriendsWithStats(
           THEN s.actual_duration
           ELSE 0
         END
-      ), 0)::int AS week_seconds
+      ), 0)::int AS week_seconds,
+      CASE
+        WHEN p.updated_at IS NULL OR p.updated_at < NOW() - INTERVAL '120 seconds' THEN 'offline'
+        WHEN p.phase = 'work' THEN 'working'
+        WHEN p.phase = 'break' THEN 'break'
+        ELSE 'online'
+      END AS presence
     FROM friendships f
     JOIN "user" u ON u.id = CASE WHEN f.requester_id = ${userId} THEN f.addressee_id ELSE f.requester_id END
     LEFT JOIN sessions s ON s.user_id = u.id
+    LEFT JOIN presence p ON p.user_id = u.id
     WHERE (f.requester_id = ${userId} OR f.addressee_id = ${userId})
       AND f.status = 'accepted'
-    GROUP BY f.id, u.id, u.name, u.image
+    GROUP BY f.id, u.id, u.name, u.image, p.phase, p.updated_at
     ORDER BY week_seconds DESC, u.name ASC
   `;
 
@@ -136,6 +147,7 @@ export async function getFriendsWithStats(
     image: r.image,
     todaySeconds: Number(r.today_seconds),
     weekSeconds: Number(r.week_seconds),
+    presence: r.presence,
   }));
 }
 

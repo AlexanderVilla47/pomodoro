@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 
+type FriendPresence = "working" | "break" | "online" | "offline";
+
 interface FriendUser {
   friendshipId: number;
   userId: string;
@@ -10,7 +12,18 @@ interface FriendUser {
   image: string | null;
   todaySeconds: number;
   weekSeconds: number;
+  presence: FriendPresence;
 }
+
+const PRESENCE_META: Record<
+  FriendPresence,
+  { color: string; label: string } | null
+> = {
+  working: { color: "#4ADE80", label: "Trabajando" },
+  break: { color: "#60A5FA", label: "En descanso" },
+  online: { color: "#9CA3AF", label: "En línea" },
+  offline: null,
+};
 
 interface PendingRequest {
   friendshipId: number;
@@ -75,18 +88,21 @@ export function FriendsPanel() {
 
   const tzOffset = -new Date().getTimezoneOffset();
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const res = await fetch(`/api/friends?tz=${tzOffset}`);
       if (res.ok) setData(await res.json());
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [tzOffset]);
 
+  // Carga inicial + refresco silencioso cada 40s (stats y presencia)
   useEffect(() => {
     load();
+    const id = setInterval(() => load(true), 40_000);
+    return () => clearInterval(id);
   }, [load]);
 
   useEffect(() => {
@@ -262,9 +278,28 @@ export function FriendsPanel() {
         <div className="flex flex-col gap-1.5">
           {data?.friends.map((friend) => (
             <div key={friend.friendshipId} className="group flex items-center gap-2.5 p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/[0.07] transition-colors">
-              <Avatar name={friend.name} image={friend.image} size={30} />
+              <div className="relative shrink-0">
+                <Avatar name={friend.name} image={friend.image} size={30} />
+                {PRESENCE_META[friend.presence] && (
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--color-bg)]"
+                    style={{ backgroundColor: PRESENCE_META[friend.presence]!.color }}
+                    title={PRESENCE_META[friend.presence]!.label}
+                  />
+                )}
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white/80 truncate">{friend.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm text-white/80 truncate">{friend.name}</p>
+                  {(friend.presence === "working" || friend.presence === "break") && (
+                    <span
+                      className="text-[10px] shrink-0"
+                      style={{ color: PRESENCE_META[friend.presence]!.color }}
+                    >
+                      {PRESENCE_META[friend.presence]!.label.toLowerCase()}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3 mt-0.5">
                   <span className="text-[10px] text-white/35">
                     Hoy <span className="text-white/60">{formatDuration(friend.todaySeconds)}</span>

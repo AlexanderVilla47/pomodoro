@@ -20,6 +20,7 @@ import { JournalPrompt } from "@/components/JournalPrompt";
 import { JournalBridge } from "@/components/JournalPrompt/JournalBridge";
 import { Historial } from "@/components/Historial";
 import { FriendsPanel } from "@/components/Friends";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 
 type MobileTab = "timer" | "music" | "history" | "friends";
 type DesktopRightTab = "stats" | "history" | "friends";
@@ -114,6 +115,9 @@ export function HomeClient() {
     >
       {/* Auto-dismiss journal prompt when a new work session starts */}
       <JournalBridge onWorkStart={handleJournalClose} />
+
+      {/* Reporta presencia (trabajando/descanso/en línea) al servidor */}
+      <PresenceHeartbeat />
 
       {/* Single permanent yt-player anchor — always in DOM with real dimensions */}
       <div aria-hidden="true" style={{ position: "fixed", top: 0, left: 0, width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none", zIndex: -1 }}>
