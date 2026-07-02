@@ -119,4 +119,17 @@ export async function runMigrations(sql: Sql): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+
+  // Habilita Row Level Security en TODAS las tablas del esquema public sin
+  // políticas (deny-all). Supabase expone las tablas public en su API REST con
+  // la anon key pública; sin RLS quedan abiertas a lectura/escritura desde
+  // internet. La app no usa esa API (se conecta directo como dueño de las
+  // tablas, que se saltea RLS), así que esto cierra el agujero sin romper nada.
+  // Idempotente: reactivar RLS ya habilitado es un no-op.
+  const publicTables = await sql<{ tablename: string }[]>`
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  `;
+  for (const { tablename } of publicTables) {
+    await sql`ALTER TABLE ${sql(tablename)} ENABLE ROW LEVEL SECURITY`;
+  }
 }
