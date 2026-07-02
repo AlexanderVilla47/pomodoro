@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth/client";
 import { TimerProvider } from "@/context/TimerContext";
 import { YouTubePlayerProvider } from "@/context/YouTubePlayerContext";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
@@ -19,9 +21,10 @@ import { InstallButton } from "@/components/InstallButton";
 import { JournalPrompt } from "@/components/JournalPrompt";
 import { JournalBridge } from "@/components/JournalPrompt/JournalBridge";
 import { Historial } from "@/components/Historial";
+import { FriendsPanel } from "@/components/Friends";
 
-type MobileTab = "timer" | "music" | "history";
-type DesktopRightTab = "stats" | "history";
+type MobileTab = "timer" | "music" | "history" | "friends";
+type DesktopRightTab = "stats" | "history" | "friends";
 
 function hexToRgb(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -40,6 +43,8 @@ function tabCls(active: boolean) {
 
 function AppContent() {
   const { settings, updateSettings } = useSettings();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const router = useRouter();
   const [statsVersion, setStatsVersion] = useState(0);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -82,6 +87,13 @@ function AppContent() {
     requestNotificationPermission().catch(() => {});
   }, []);
 
+  // Auth guard: si no hay sesión, al login antes de que cualquier fetch explote
+  useEffect(() => {
+    if (!sessionPending && !session) {
+      router.replace("/login");
+    }
+  }, [sessionPending, session, router]);
+
   useEffect(() => {
     const color = selectedLabel?.color ?? "#5ABFA8";
     document.documentElement.style.setProperty("--color-mint", color);
@@ -97,6 +109,8 @@ function AppContent() {
     }
   }, []);
 
+  if (sessionPending) return null;
+  if (!session) return null;
   if (!settings) return null;
 
   const settingsPatch = (patch: Partial<Omit<Settings, "id">>) => {
@@ -193,12 +207,20 @@ function AppContent() {
                   >
                     Historial
                   </button>
+                  <button
+                    onClick={() => setDesktopRightTab("friends")}
+                    className={tabCls(desktopRightTab === "friends")}
+                  >
+                    Amigos
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-hidden">
                   {desktopRightTab === "stats" ? (
                     <Dashboard refreshTrigger={statsVersion} />
-                  ) : (
+                  ) : desktopRightTab === "history" ? (
                     <Historial refreshTrigger={historyVersion} />
+                  ) : (
+                    <FriendsPanel />
                   )}
                 </div>
               </div>
@@ -261,6 +283,10 @@ function AppContent() {
                 confirmTap
               />
             </div>
+
+            <div className={`absolute inset-0 overflow-y-auto p-4 transition-opacity duration-150 ${mobileTab === "friends" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              <FriendsPanel />
+            </div>
           </div>
 
           {/* Tab bar */}
@@ -298,6 +324,18 @@ function AppContent() {
                       <polyline points="14 2 14 8 20 8" />
                       <line x1="16" y1="13" x2="8" y2="13" />
                       <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                  ),
+                },
+                {
+                  tab: "friends",
+                  label: "Amigos",
+                  icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   ),
                 },

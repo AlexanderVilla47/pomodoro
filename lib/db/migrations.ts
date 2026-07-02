@@ -90,4 +90,25 @@ export async function runMigrations(sql: Sql): Promise<void> {
     CREATE INDEX IF NOT EXISTS work_logs_user_id_created_at_idx
       ON work_logs (user_id, created_at DESC)
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS friendships (
+      id           SERIAL PRIMARY KEY,
+      requester_id TEXT NOT NULL,
+      addressee_id TEXT NOT NULL,
+      status       TEXT NOT NULL CHECK (status IN ('pending', 'accepted')),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (requester_id, addressee_id)
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS friendships_addressee_id_idx
+      ON friendships (addressee_id, status)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS friendships_requester_id_idx
+      ON friendships (requester_id, status)
+  `;
 }
