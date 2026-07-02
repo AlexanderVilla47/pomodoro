@@ -24,8 +24,9 @@ export function PlaylistSwitcher({ viewedId, playingId, onView, onDelete }: Play
 
   useEffect(() => {
     fetch("/api/playlists")
-      .then((r) => r.json())
-      .then((data: Playlist[]) => {
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: Playlist[] | null) => {
+        if (!Array.isArray(data)) return;
         setPlaylists(data);
         const saved = localStorage.getItem(LS_KEY);
         const initial = saved ?? data[0]?.playlist_id ?? null;

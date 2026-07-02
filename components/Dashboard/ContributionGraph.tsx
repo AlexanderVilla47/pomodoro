@@ -112,11 +112,14 @@ export function ContributionGraph({ initialYear, onDateClick, selectedDate, cell
   useEffect(() => {
     const tz = -new Date().getTimezoneOffset();
     fetch(`/api/stats/heatmap?year=${year}&tz=${tz}`)
-      .then((r) => r.json())
-      .then(({ days, years: ys }: { days: DayData[]; years: number[] }) => {
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { days: DayData[]; years: number[] } | null) => {
+        const days = data?.days;
+        const years = data?.years;
+        if (!Array.isArray(days) || !Array.isArray(years)) return;
         const map = new Map<string, number>(days.map((d) => [d.date, d.total_seconds]));
         setWeeks(buildWeeks(year, map));
-        setYears(ys);
+        setYears(years);
       })
       .catch(console.error);
   }, [year]);

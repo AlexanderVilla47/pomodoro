@@ -24,25 +24,28 @@ export function Dashboard({ refreshTrigger }: DashboardProps) {
   useEffect(() => {
     const tz = getTzOffset();
     fetch(`/api/stats?tz=${tz}`)
-      .then((r) => r.json())
-      .then(setStats)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.today) setStats(data); })
       .catch(console.error);
   }, [refreshTrigger]);
+
+  const today = stats?.today ?? null;
+  const week = stats?.week ?? null;
 
   return (
     <div className="flex flex-col gap-2 p-3 rounded-2xl bg-white/5 border border-white/10">
       <div className="grid grid-cols-2 gap-2">
         <StatsCard
           label="Hoy"
-          count={stats?.today.count ?? 0}
-          totalSeconds={stats?.today.total_seconds ?? 0}
-          isLoading={stats === null}
+          count={today?.count ?? 0}
+          totalSeconds={today?.total_seconds ?? 0}
+          isLoading={today === null}
         />
         <StatsCard
           label="Esta semana"
-          count={stats?.week.count ?? 0}
-          totalSeconds={stats?.week.total_seconds ?? 0}
-          isLoading={stats === null}
+          count={week?.count ?? 0}
+          totalSeconds={week?.total_seconds ?? 0}
+          isLoading={week === null}
         />
       </div>
 
