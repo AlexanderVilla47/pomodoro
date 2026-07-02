@@ -107,12 +107,14 @@ export function TimerProvider({
 
       const afterComplete = transition(m, "COMPLETE");
 
-      // Full cycle done — stop after long break, user restarts manually
+      // Full cycle done — reset to a fresh work-ready state so the UI muestra
+      // "Enfoque" (no el descanso largo recién terminado) y START arranca un
+      // ciclo nuevo desde cero. El usuario reinicia manualmente.
       if (m.phase === "long_break") {
         endTimeRef.current = null;
         localStorage.removeItem(LS_KEY);
         stopKeepAlive();
-        setMachine(afterComplete);
+        setMachine({ status: "idle", phase: "work", sessionCount: 0 });
         return;
       }
 
