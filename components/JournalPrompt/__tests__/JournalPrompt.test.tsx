@@ -39,7 +39,7 @@ describe("JournalPrompt", () => {
   it("Guardar llama saveWorkLog con sessionId, notes y topics, luego onSaved", async () => {
     setup(5);
 
-    fireEvent.change(screen.getByPlaceholderText(/Ej:/), {
+    fireEvent.change(screen.getByPlaceholderText(/Descripción/i), {
       target: { value: "Estudié grafos" },
     });
 
@@ -57,7 +57,7 @@ describe("JournalPrompt", () => {
 
   it("Enter en el input de topics agrega un chip", () => {
     setup(1);
-    const input = screen.getByPlaceholderText("BFS, grafos, hooks...");
+    const input = screen.getByPlaceholderText("Título: ej. Unidad 1, Sesión de trabajo...");
     fireEvent.change(input, { target: { value: "grafos" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(screen.getByText("grafos")).toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("JournalPrompt", () => {
 
   it("Backspace con draft vacío elimina el último chip", () => {
     setup(1);
-    const input = screen.getByPlaceholderText("BFS, grafos, hooks...");
+    const input = screen.getByPlaceholderText("Título: ej. Unidad 1, Sesión de trabajo...");
     fireEvent.change(input, { target: { value: "tema1" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(screen.getByText("tema1")).toBeInTheDocument();

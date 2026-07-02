@@ -41,12 +41,20 @@ describe("TimerRing", () => {
     expect(offset).toBeCloseTo(CIRCUMFERENCE, 1);
   });
 
-  it("usa color coral para phase work", () => {
+  it("aplica el accentColor provisto al círculo de progreso", () => {
+    const { container } = render(
+      <TimerRing remaining={1500000} total={1500000} phase="work" accentColor="coral" />
+    );
+    const circle = container.querySelector("circle.progress") as SVGCircleElement;
+    expect(circle.getAttribute("stroke")).toContain("coral");
+  });
+
+  it("usa var(--color-mint) por defecto cuando no hay accentColor", () => {
     const { container } = render(
       <TimerRing remaining={1500000} total={1500000} phase="work" />
     );
     const circle = container.querySelector("circle.progress") as SVGCircleElement;
-    expect(circle.getAttribute("stroke")).toContain("coral");
+    expect(circle.getAttribute("stroke")).toContain("mint");
   });
 
   it("usa color mint para phase short_break", () => {

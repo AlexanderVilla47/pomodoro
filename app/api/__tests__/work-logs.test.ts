@@ -108,6 +108,8 @@ describe("GET /api/work-logs", () => {
     expect(mockGet).toHaveBeenCalledWith(expect.anything(), "test-user", {
       limit: 50,
       cursor: undefined,
+      date: undefined,
+      tz: 0,
     });
   });
 });

@@ -24,7 +24,7 @@ describe("SettingsPanel", () => {
     const onSave = vi.fn();
     render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={onSave} />);
 
-    const workInput = screen.getByLabelText(/trabajo/i);
+    const workInput = screen.getByLabelText(/enfoque/i);
     await userEvent.clear(workInput);
     await userEvent.type(workInput, "30");
 
@@ -37,7 +37,7 @@ describe("SettingsPanel", () => {
 
   it("muestra error si work_duration < 1", async () => {
     render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
-    const workInput = screen.getByLabelText(/trabajo/i);
+    const workInput = screen.getByLabelText(/enfoque/i);
     await userEvent.clear(workInput);
     await userEvent.type(workInput, "0");
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
