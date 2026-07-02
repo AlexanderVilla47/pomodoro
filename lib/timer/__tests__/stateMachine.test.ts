@@ -92,6 +92,34 @@ describe("transition — rotación de phase", () => {
     expect(state.phase).toBe("long_break");
   });
 
+  it("respeta un longBreakInterval custom (3) en vez de la constante por defecto", () => {
+    let state: MachineState = { status: "idle", phase: "work", sessionCount: 2 };
+    state = transition(state, "START", 3);
+    state = transition(state, "COMPLETE", 3);
+    state = transition(state, "START", 3);
+    expect(state.phase).toBe("long_break");
+  });
+
+  it("con longBreakInterval custom (3), en sesión 4 NO va a long_break", () => {
+    let state: MachineState = { status: "idle", phase: "work", sessionCount: 3 };
+    state = transition(state, "START", 3);
+    state = transition(state, "COMPLETE", 3);
+    state = transition(state, "START", 3);
+    expect(state.phase).toBe("short_break");
+  });
+
+  it("START tras completar el long_break reinicia el ciclo (work, sessionCount 0)", () => {
+    const completedLongBreak: MachineState = {
+      status: "completed",
+      phase: "long_break",
+      sessionCount: 4,
+    };
+    const next = transition(completedLongBreak, "START");
+    expect(next.status).toBe("running");
+    expect(next.phase).toBe("work");
+    expect(next.sessionCount).toBe(0);
+  });
+
   it("SKIP en running avanza a la siguiente phase sin incrementar sessionCount (break skip)", () => {
     const afterWork = transition(transition(idle, "START"), "COMPLETE");
     const breakRunning = transition(afterWork, "START");

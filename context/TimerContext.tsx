@@ -58,6 +58,9 @@ export function TimerProvider({
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const soundTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // guards against advancing the same phase-expiry twice when the ticker and
+  // the background setTimeout both fire around the boundary (foreground case)
+  const processedEndTimeRef = useRef<number | null>(null);
 
   const onSessionLoggedRef = useRef(onSessionLogged);
   onSessionLoggedRef.current = onSessionLogged;
@@ -86,10 +89,19 @@ export function TimerProvider({
     [logSession, settings.work_duration]
   );
 
-  useEffect(() => {
-    const handleSessionEnd = (m: MachineState) => {
-      // Sound is fired by the dedicated setTimeout effect, not here
-      const elapsed = phaseDuration(m.phase, settings);
+  // Authoritative phase-boundary handler. Shared by the GSAP ticker (foreground
+  // smoothness), the visibility handler (catch-up on return), and the background
+  // setTimeout (the only one that keeps firing when the tab is hidden).
+  const handleSessionEnd = useCallback(
+    (m: MachineState) => {
+      const expiredEndTime = endTimeRef.current;
+      if (expiredEndTime === null) return;
+      // idempotency: each distinct phase-expiry is processed exactly once,
+      // no matter which of the three triggers reaches it first
+      if (processedEndTimeRef.current === expiredEndTime) return;
+      processedEndTimeRef.current = expiredEndTime;
+
+      const elapsed = phaseDuration(m.phase, settingsRef.current);
       doLog(m, elapsed, true);
 
       const afterComplete = transition(m, "COMPLETE");
@@ -102,9 +114,9 @@ export function TimerProvider({
         return;
       }
 
-      const afterStart = transition(afterComplete, "START");
+      const afterStart = transition(afterComplete, "START", settingsRef.current.long_break_interval);
       if (afterStart.status === "running") {
-        const nextDur = phaseDuration(afterStart.phase, settings);
+        const nextDur = phaseDuration(afterStart.phase, settingsRef.current);
         endTimeRef.current = Date.now() + nextDur;
         pausedRemainingRef.current = nextDur;
         sessionStartRef.current = Date.now();
@@ -115,8 +127,11 @@ export function TimerProvider({
         localStorage.removeItem(LS_KEY);
       }
       setMachine(afterStart);
-    };
+    },
+    [doLog]
+  );
 
+  useEffect(() => {
     const tick = () => {
       const m = machineRef.current;
       if (m.status !== "running" || endTimeRef.current === null) return;
@@ -142,7 +157,7 @@ export function TimerProvider({
       gsap.ticker.remove(tick);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [settings, doLog]);
+  }, [handleSessionEnd]);
 
   // setTimeout fires at exact expiry time even in background tabs —
   // GSAP ticker can't be relied on for sound since it throttles in background
@@ -158,6 +173,10 @@ export function TimerProvider({
     const phase = machine.phase;
     soundTimeoutRef.current = setTimeout(() => {
       notifySessionComplete(phase, settingsRef.current.notification_sound_enabled);
+      // advance the cycle here too: setTimeout keeps firing in background tabs,
+      // the GSAP ticker (requestAnimationFrame) does not. This is what lets the
+      // next session/break start automatically while the tab is hidden.
+      handleSessionEnd(machineRef.current);
     }, delay);
     return () => {
       if (soundTimeoutRef.current !== null) {
@@ -165,7 +184,7 @@ export function TimerProvider({
         soundTimeoutRef.current = null;
       }
     };
-  }, [machine.status, machine.phase]);
+  }, [machine, handleSessionEnd]);
 
   useEffect(() => {
     if (machine.status === "idle" || machine.status === "completed") {
@@ -214,7 +233,7 @@ export function TimerProvider({
 
   const start = useCallback(() => {
     setMachine((prev) => {
-      const next = transition(prev, "START");
+      const next = transition(prev, "START", settingsRef.current.long_break_interval);
       if (next.status === "running") {
         const dur = phaseDuration(next.phase, settings);
         endTimeRef.current = Date.now() + dur;
@@ -273,7 +292,7 @@ export function TimerProvider({
       endTimeRef.current = null;
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_PAUSED_KEY);
-      return transition(prev, "SKIP");
+      return transition(prev, "SKIP", settingsRef.current.long_break_interval);
     });
   }, []);
 

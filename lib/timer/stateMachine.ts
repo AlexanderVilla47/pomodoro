@@ -9,19 +9,28 @@ export interface MachineState {
   sessionCount: number;
 }
 
-function nextPhase(state: MachineState): TimerPhase {
+function nextPhase(state: MachineState, longBreakInterval: number): TimerPhase {
   if (state.phase !== "work") return "work";
-  if (state.sessionCount > 0 && state.sessionCount % DEFAULT_LONG_BREAK_INTERVAL === 0) return "long_break";
+  if (state.sessionCount > 0 && state.sessionCount % longBreakInterval === 0) return "long_break";
   return "short_break";
 }
 
-export function transition(state: MachineState, action: TimerAction): MachineState {
+export function transition(
+  state: MachineState,
+  action: TimerAction,
+  longBreakInterval: number = DEFAULT_LONG_BREAK_INTERVAL
+): MachineState {
   const { status, phase, sessionCount } = state;
 
   switch (action) {
     case "START": {
       if (status === "idle" || status === "completed") {
-        const newPhase = status === "completed" ? nextPhase(state) : phase;
+        // A full cycle closes after the long break — starting again begins a
+        // fresh cycle from session zero, honoring any new interval setting.
+        if (status === "completed" && phase === "long_break") {
+          return { status: "running", phase: "work", sessionCount: 0 };
+        }
+        const newPhase = status === "completed" ? nextPhase(state, longBreakInterval) : phase;
         return { status: "running", phase: newPhase, sessionCount };
       }
       return state;
@@ -54,7 +63,7 @@ export function transition(state: MachineState, action: TimerAction): MachineSta
 
     case "SKIP": {
       if (status === "running" || status === "paused") {
-        const skippedPhase = nextPhase(state);
+        const skippedPhase = nextPhase(state, longBreakInterval);
         return { status: "idle", phase: skippedPhase, sessionCount };
       }
       return state;
