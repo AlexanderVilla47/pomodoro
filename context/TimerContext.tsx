@@ -6,6 +6,7 @@ import { transition } from "@/lib/timer/stateMachine";
 import { computeRemaining, shouldLog } from "@/lib/timer/engine";
 import { useSessionLogger } from "@/hooks/useSessionLogger";
 import { notifySessionComplete } from "@/lib/notifications";
+import { startKeepAlive, stopKeepAlive } from "@/lib/timer/keepAlive";
 import type { MachineState } from "@/lib/timer/stateMachine";
 import type { Settings } from "@/lib/db/queries/settings";
 
@@ -110,6 +111,7 @@ export function TimerProvider({
       if (m.phase === "long_break") {
         endTimeRef.current = null;
         localStorage.removeItem(LS_KEY);
+        stopKeepAlive();
         setMachine(afterComplete);
         return;
       }
@@ -241,6 +243,8 @@ export function TimerProvider({
         sessionStartRef.current = Date.now();
         localStorage.setItem(LS_KEY, JSON.stringify({ endTime: endTimeRef.current, phase: next.phase, sessionCount: next.sessionCount }));
         localStorage.removeItem(LS_PAUSED_KEY);
+        // gesto del usuario: habilita el keep-alive de audio contra el freeze
+        startKeepAlive();
       }
       return next;
     });
@@ -252,6 +256,7 @@ export function TimerProvider({
       pausedRemainingRef.current = remaining;
       endTimeRef.current = null;
       localStorage.removeItem(LS_KEY);
+      stopKeepAlive();
       const next = transition(prev, "PAUSE");
       localStorage.setItem(
         LS_PAUSED_KEY,
@@ -268,6 +273,8 @@ export function TimerProvider({
       const next = transition(prev, "RESUME");
       localStorage.setItem(LS_KEY, JSON.stringify({ endTime: endTimeRef.current, phase: next.phase, sessionCount: next.sessionCount }));
       localStorage.removeItem(LS_PAUSED_KEY);
+      // gesto del usuario: reactiva el keep-alive de audio
+      startKeepAlive();
       return next;
     });
   }, []);
@@ -283,6 +290,7 @@ export function TimerProvider({
       endTimeRef.current = null;
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_PAUSED_KEY);
+      stopKeepAlive();
       return transition(prev, "STOP");
     });
   }, [settings, doLog]);
@@ -292,9 +300,13 @@ export function TimerProvider({
       endTimeRef.current = null;
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_PAUSED_KEY);
+      stopKeepAlive();
       return transition(prev, "SKIP", settingsRef.current.long_break_interval);
     });
   }, []);
+
+  // asegura cortar el tono keep-alive si el provider se desmonta corriendo
+  useEffect(() => () => stopKeepAlive(), []);
 
   return (
     <TimerContext.Provider
