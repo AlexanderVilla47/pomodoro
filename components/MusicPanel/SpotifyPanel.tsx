@@ -67,10 +67,19 @@ export function SpotifyPanel() {
     if (player.contextUri) setFollowContext(true);
   }, [player.contextUri]);
 
-  // La URI cuya lista mostramos: si seguimos el contexto y es expandible, esa;
-  // si no, la playlist de la pestaña seleccionada.
-  const displayUri =
-    followContext && isExpandableContext(player.contextUri)
+  // Si estamos siguiendo la música y hay algo sonando SIN contexto expandible
+  // (radio, autoplay, tema suelto), no mostramos lista: caemos a la guía que
+  // empuja a elegir playlist o álbum.
+  const playingWithoutContext =
+    followContext &&
+    player.currentTrackUri !== null &&
+    !isExpandableContext(player.contextUri);
+
+  // La URI cuya lista mostramos: si seguimos un contexto expandible, ese; si
+  // suena algo sin contexto, ninguna (guía); si no, la pestaña seleccionada.
+  const displayUri = playingWithoutContext
+    ? null
+    : followContext && isExpandableContext(player.contextUri)
       ? player.contextUri
       : viewedId
         ? `spotify:playlist:${viewedId}`
@@ -274,17 +283,20 @@ export function SpotifyPanel() {
             <p className="text-xs text-white/30 text-center py-2">Esta lista está vacía.</p>
           )}
 
-          {/* A continuación — cola del SDK cuando no hay lista expandible
-              (radio, autoplay o tema suelto sin contexto) */}
-          {!tracksLoading && player.nextTracks.length > 0 && (
-            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-0.5">
-              <p className="text-[10px] text-white/25 px-2 pb-1 uppercase tracking-wider">A continuación</p>
-              {player.nextTracks.map((t, i) => (
-                <div key={`${t.uri}-${i}`} className="w-full text-left px-2 py-1.5 rounded-lg text-xs text-white/50">
-                  <span className="font-medium truncate block">{t.name}</span>
-                  <span className="text-white/25 truncate block">{t.artists[0]?.name ?? ""}</span>
-                </div>
-              ))}
+          {/* Sin playlist ni álbum en reproducción (radio, autoplay o tema
+              suelto): en vez de una cola capada, empujamos a elegir un contexto
+              con lista completa. */}
+          {!tracksLoading && !tracksError && !displayUri && (
+            <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-1.5 text-center px-6">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-white/15">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              <p className="text-xs text-white/40">Poné una playlist o un álbum</p>
+              <p className="text-[10px] text-white/25 max-w-[220px]">
+                Así se carga la lista completa y podés saltar a cualquier canción desde acá.
+              </p>
             </div>
           )}
         </>
