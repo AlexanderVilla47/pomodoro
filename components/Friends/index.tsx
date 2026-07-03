@@ -390,6 +390,17 @@ export function FriendsPanel() {
               <Avatar name={req.name} image={req.image} size={30} />
               <span className="flex-1 text-sm text-white/40 truncate">{req.name}</span>
               <span className="text-[10px] text-white/25 italic">Pendiente</span>
+              <button
+                onClick={() => handleRemove(req.friendshipId)}
+                title="Cancelar solicitud"
+                aria-label="Cancelar solicitud"
+                className="w-6 h-6 flex items-center justify-center rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
           ))}
         </div>

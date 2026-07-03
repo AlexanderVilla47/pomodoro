@@ -138,8 +138,12 @@ export async function removeFriend(
   const rows = await sql`
     DELETE FROM friendships
     WHERE id = ${id}
-      AND status = 'accepted'
-      AND (requester_id = ${userId} OR addressee_id = ${userId})
+      AND (
+        -- Eliminar una amistad aceptada (cualquiera de los dos la puede borrar)
+        (status = 'accepted' AND (requester_id = ${userId} OR addressee_id = ${userId}))
+        -- o cancelar una solicitud pendiente que YO envié (soy el requester)
+        OR (status = 'pending' AND requester_id = ${userId})
+      )
   `;
   return rows.count > 0;
 }

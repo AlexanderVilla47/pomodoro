@@ -1,8 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import { searchUsers, findUserById } from "../friends";
+import { searchUsers, findUserById, removeFriend } from "../friends";
 
 function makeSql(rows: unknown[] = []) {
   const tag = vi.fn((..._args: unknown[]) => Promise.resolve(rows)) as unknown;
+  (tag as Record<string, unknown>).unsafe = vi.fn();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return tag as any;
+}
+
+// postgres devuelve un resultado tipo array con una propiedad `count` (filas
+// afectadas). Este fake replica eso para queries de DELETE/UPDATE.
+function makeCountSql(count: number) {
+  const result = Object.assign([] as unknown[], { count });
+  const tag = vi.fn((..._args: unknown[]) => Promise.resolve(result)) as unknown;
   (tag as Record<string, unknown>).unsafe = vi.fn();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return tag as any;
@@ -38,6 +48,21 @@ describe("searchUsers", () => {
     const sqlEmail = makeSql([]);
     await searchUsers(sqlEmail, "juan@mail.com", "u1");
     expect(sqlEmail).toHaveBeenCalled();
+  });
+});
+
+describe("removeFriend", () => {
+  it("retorna true cuando borra una fila (amistad o solicitud propia)", async () => {
+    const sql = makeCountSql(1);
+    const ok = await removeFriend(sql, 5, "u1");
+    expect(ok).toBe(true);
+    expect(sql).toHaveBeenCalledOnce();
+  });
+
+  it("retorna false cuando no hay nada para borrar", async () => {
+    const sql = makeCountSql(0);
+    const ok = await removeFriend(sql, 5, "u1");
+    expect(ok).toBe(false);
   });
 });
 
