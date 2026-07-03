@@ -12,12 +12,6 @@ function statusMessage(status: SpotifyPlayerStatus): string | null {
   return null;
 }
 
-// Un contexto es "expandible" a lista si es playlist o álbum. Radio, artista o
-// un tema suelto no tienen una lista ordenada que mostrar.
-function isExpandableContext(uri: string | null): uri is string {
-  return uri !== null && /^spotify:(playlist|album):/.test(uri);
-}
-
 export function SpotifyPanel() {
   const player = useSpotifyPlayer();
 
@@ -28,9 +22,7 @@ export function SpotifyPanel() {
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksError, setTracksError] = useState(false);
-  // Cuando es true, la lista sigue lo que SUENA (context.uri). Cuando el usuario
-  // toca una pestaña, pasa a false para poder navegar una playlist guardada.
-  const [followContext, setFollowContext] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [volume, setVolume] = useState(80);
   const onViewRef = useRef(setViewedId);
 
@@ -61,57 +53,32 @@ export function SpotifyPanel() {
     if (connected) player.initSDK();
   }, [connected]);
 
-  // Cuando arranca a sonar algo desde afuera (o cambia el contexto), volvemos a
-  // seguir la música automáticamente.
   useEffect(() => {
-    if (player.contextUri) setFollowContext(true);
-  }, [player.contextUri]);
-
-  // Si estamos siguiendo la música y hay algo sonando SIN contexto expandible
-  // (radio, autoplay, tema suelto), no mostramos lista: caemos a la guía que
-  // empuja a elegir playlist o álbum.
-  const playingWithoutContext =
-    followContext &&
-    player.currentTrackUri !== null &&
-    !isExpandableContext(player.contextUri);
-
-  // La URI cuya lista mostramos: si seguimos un contexto expandible, ese; si
-  // suena algo sin contexto, ninguna (guía); si no, la pestaña seleccionada.
-  const displayUri = playingWithoutContext
-    ? null
-    : followContext && isExpandableContext(player.contextUri)
-      ? player.contextUri
-      : viewedId
-        ? `spotify:playlist:${viewedId}`
-        : null;
-
-  const showingContext = displayUri === player.contextUri && isExpandableContext(player.contextUri);
-
-  useEffect(() => {
-    if (!displayUri) {
-      setTracks([]);
-      return;
-    }
+    if (!viewedId) return;
     setTracks([]);
     setTracksError(false);
     setTracksLoading(true);
-    fetch(`/api/spotify/context?uri=${encodeURIComponent(displayUri)}`)
+    fetch(`/api/spotify/playlists/${viewedId}`)
       .then((r) => r.json())
-      .then((data: { tracks?: SpotifyTrack[] } | null) => {
-        if (data && Array.isArray(data.tracks)) {
-          setTracks(data.tracks);
+      .then((data: unknown) => {
+        if (Array.isArray(data)) {
+          setTracks(data as SpotifyTrack[]);
         } else {
           setTracksError(true);
         }
       })
       .catch(() => setTracksError(true))
       .finally(() => setTracksLoading(false));
-  }, [displayUri]);
+  }, [viewedId]);
 
-  const handleView = useCallback((id: string) => {
-    setViewedId(id);
-    setFollowContext(false);
-  }, []);
+  useEffect(() => {
+    if (player.currentTrackUri) {
+      const idx = tracks.findIndex((t) => t.uri === player.currentTrackUri);
+      if (idx >= 0) setCurrentIndex(idx);
+    }
+  }, [player.currentTrackUri, tracks]);
+
+  const handleView = useCallback((id: string) => setViewedId(id), []);
 
   const handleDisconnect = useCallback(async () => {
     player.disconnect();
@@ -122,12 +89,11 @@ export function SpotifyPanel() {
   }, [player.disconnect]);
 
   const handleTrackSelect = useCallback(
-    (trackUri: string) => {
-      if (!displayUri) return;
-      player.playContext(displayUri, trackUri);
-      setFollowContext(true);
+    (index: number) => {
+      setCurrentIndex(index);
+      player.loadAndPlay(tracks.map((t) => t.uri), index);
     },
-    [displayUri, player.playContext]
+    [tracks, player.loadAndPlay]
   );
 
   const handleVolumeChange = useCallback(
@@ -166,22 +132,19 @@ export function SpotifyPanel() {
     <div className="flex-1 min-h-0 flex flex-col gap-3">
       {/* Playlist tabs */}
       <div className="shrink-0 flex items-center gap-1.5 flex-wrap">
-        {playlists.map((p) => {
-          const active = displayUri === `spotify:playlist:${p.id}`;
-          return (
-            <button
-              key={p.id}
-              onClick={() => handleView(p.id)}
-              className={`px-2.5 py-0.5 rounded-full text-xs transition-colors whitespace-nowrap ${
-                active
-                  ? "bg-[#1DB954] text-black font-semibold"
-                  : "bg-white/10 text-white/60 hover:bg-white/20"
-              }`}
-            >
-              {p.name}
-            </button>
-          );
-        })}
+        {playlists.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => handleView(p.id)}
+            className={`px-2.5 py-0.5 rounded-full text-xs transition-colors whitespace-nowrap ${
+              viewedId === p.id
+                ? "bg-[#1DB954] text-black font-semibold"
+                : "bg-white/10 text-white/60 hover:bg-white/20"
+            }`}
+          >
+            {p.name}
+          </button>
+        ))}
         <button
           onClick={handleDisconnect}
           className="ml-auto text-xs text-white/20 hover:text-white/50 transition-colors"
@@ -189,12 +152,6 @@ export function SpotifyPanel() {
           Desconectar
         </button>
       </div>
-
-      {playlistsError && (
-        <p className="shrink-0 text-xs text-red-400/70 text-center">
-          Error al cargar tus playlists.
-        </p>
-      )}
 
       {/* SDK status / error */}
       {msg && (
@@ -240,21 +197,13 @@ export function SpotifyPanel() {
         </div>
       )}
 
-      {/* Lista de tracks: el contexto que suena, o la playlist navegada */}
+      {/* Track list de la playlist seleccionada */}
       {tracks.length > 0 && (
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-0.5">
-          <div className="flex items-center justify-between px-2 pb-1">
-            <p className="text-[10px] text-white/25 uppercase tracking-wider">
-              {showingContext ? "Sonando ahora" : "Playlist"}
-            </p>
-            {showingContext && player.shuffle && (
-              <span className="text-[10px] text-[#1DB954]/70">aleatorio</span>
-            )}
-          </div>
           {tracks.map((t, i) => (
             <button
-              key={`${t.uri}-${i}`}
-              onClick={() => handleTrackSelect(t.uri)}
+              key={t.uri}
+              onClick={() => handleTrackSelect(i)}
               className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${
                 t.uri === player.currentTrackUri
                   ? "bg-[#1DB954]/20 text-[#1DB954]"
@@ -279,24 +228,20 @@ export function SpotifyPanel() {
               Error al cargar los tracks. Probá reconectar tu cuenta.
             </p>
           )}
-          {!tracksLoading && !tracksError && displayUri && (
-            <p className="text-xs text-white/30 text-center py-2">Esta lista está vacía.</p>
+          {!tracksLoading && !tracksError && viewedId && (
+            <p className="text-xs text-white/30 text-center py-2">Esta playlist está vacía.</p>
           )}
 
-          {/* Sin playlist ni álbum en reproducción (radio, autoplay o tema
-              suelto): en vez de una cola capada, empujamos a elegir un contexto
-              con lista completa. */}
-          {!tracksLoading && !tracksError && !displayUri && (
-            <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-1.5 text-center px-6">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-white/15">
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
-              <p className="text-xs text-white/40">Poné una playlist o un álbum</p>
-              <p className="text-[10px] text-white/25 max-w-[220px]">
-                Así se carga la lista completa y podés saltar a cualquier canción desde acá.
-              </p>
+          {/* A continuación — cola del SDK cuando no hay lista de playlist */}
+          {!tracksLoading && player.nextTracks.length > 0 && (
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-0.5">
+              <p className="text-[10px] text-white/25 px-2 pb-1 uppercase tracking-wider">A continuación</p>
+              {player.nextTracks.map((t) => (
+                <div key={t.uri} className="w-full text-left px-2 py-1.5 rounded-lg text-xs text-white/50">
+                  <span className="font-medium truncate block">{t.name}</span>
+                  <span className="text-white/25 truncate block">{t.artists[0]?.name ?? ""}</span>
+                </div>
+              ))}
             </div>
           )}
         </>
