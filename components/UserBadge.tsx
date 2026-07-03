@@ -13,6 +13,7 @@ export function UserBadge({ className, compact }: { className?: string; compact?
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -63,17 +64,84 @@ export function UserBadge({ className, compact }: { className?: string; compact?
 
   if (compact) {
     return (
-      <button
-        onClick={handleSignOut}
-        title="Cerrar sesión"
-        className={`w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden hover:ring-2 hover:ring-white/20 transition-all ${className ?? ""}`}
-      >
-        {image ? (
-          <Image src={image} alt={name ?? email ?? ""} width={32} height={32} className="object-cover" />
-        ) : (
-          <span className="text-xs font-medium text-white/70">{initials}</span>
+      <div className={`relative ${className ?? ""}`}>
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          title="Cuenta"
+          className="w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden hover:ring-2 hover:ring-white/20 transition-all"
+        >
+          {image ? (
+            <Image src={image} alt={name ?? email ?? ""} width={32} height={32} className="object-cover" />
+          ) : (
+            <span className="text-xs font-medium text-white/70">{initials}</span>
+          )}
+        </button>
+
+        {menuOpen && (
+          <>
+            {/* Backdrop para cerrar al tocar afuera */}
+            <div
+              className="fixed inset-0 z-30"
+              onClick={() => {
+                setMenuOpen(false);
+                setEditing(false);
+              }}
+            />
+            <div className="absolute top-full right-0 mt-2 z-40 w-56 bg-[var(--color-bg)] rounded-xl border border-white/10 shadow-2xl p-1.5 flex flex-col gap-0.5">
+              {editing ? (
+                <div className="flex items-center gap-1.5 px-2 py-1.5">
+                  <input
+                    ref={editInputRef}
+                    value={nameInput}
+                    maxLength={MAX_NAME_LENGTH}
+                    disabled={saving}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveName();
+                      if (e.key === "Escape") setEditing(false);
+                    }}
+                    className="text-xs text-white bg-transparent flex-1 min-w-0 outline-none border-b border-mint/50 pb-0.5"
+                  />
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handleSaveName}
+                    disabled={saving}
+                    title="Guardar"
+                    aria-label="Guardar nombre"
+                    className="shrink-0 text-mint hover:text-mint/80 disabled:opacity-40"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={startEditing}
+                  className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors text-left"
+                >
+                  <span className="text-xs text-white/80 truncate">{name ?? email}</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0 text-white/40">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors text-xs text-white/50 hover:text-white/80"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Salir
+              </button>
+            </div>
+          </>
         )}
-      </button>
+      </div>
     );
   }
 

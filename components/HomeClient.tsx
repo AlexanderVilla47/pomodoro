@@ -21,6 +21,7 @@ import { JournalBridge } from "@/components/JournalPrompt/JournalBridge";
 import { Historial } from "@/components/Historial";
 import { FriendsPanel } from "@/components/Friends";
 import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { CheerPulse } from "@/components/CheerPulse";
 
 type MobileTab = "timer" | "music" | "history" | "friends";
 type DesktopRightTab = "stats" | "history" | "friends";
@@ -51,6 +52,7 @@ export function HomeClient() {
   const [desktopRightTab, setDesktopRightTab] = useState<DesktopRightTab>("stats");
   const [mobileHistorialView, setMobileHistorialView] = useState<"calendar" | "day">("calendar");
   const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
+  const [cheerReveal, setCheerReveal] = useState<{ names: string[]; count: number } | null>(null);
 
   const { saveWorkLog } = useWorkLogger();
 
@@ -66,6 +68,18 @@ export function HomeClient() {
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 1200);
     if (sessionId !== null) setPendingSessionId(sessionId);
+
+    // Revela quiénes te alentaron durante la sesión (y los marca como vistos).
+    fetch("/api/cheers/reveal", { method: "POST" })
+      .then((r) => r.json())
+      .then((data: { names: string[]; count: number }) => {
+        if (data.count > 0) {
+          setCheerReveal(data);
+          window.dispatchEvent(new Event("cheers-seen"));
+          setTimeout(() => setCheerReveal(null), 6000);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleJournalClose = useCallback(() => {
@@ -118,6 +132,24 @@ export function HomeClient() {
 
       {/* Reporta presencia (trabajando/descanso/en línea) al servidor */}
       <PresenceHeartbeat />
+
+      {/* Pulso en vivo anónimo de alientos recibidos */}
+      <CheerPulse />
+
+      {/* Reveal de nombres al terminar la sesión (reemplaza al pulso) */}
+      {cheerReveal && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-40 pointer-events-none max-w-[90vw]">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/20 border border-orange-400/40 backdrop-blur-md shadow-lg">
+            <span className="text-base shrink-0">🔥</span>
+            <span className="text-xs font-medium text-orange-100 truncate">
+              {cheerReveal.count === 1
+                ? "1 amigo te alentó"
+                : `${cheerReveal.count} amigos te alentaron`}
+              : {cheerReveal.names.join(", ")}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Single permanent yt-player anchor — always in DOM with real dimensions */}
       <div aria-hidden="true" style={{ position: "fixed", top: 0, left: 0, width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none", zIndex: -1 }}>
@@ -307,18 +339,6 @@ export function HomeClient() {
                   ),
                 },
                 {
-                  tab: "history",
-                  label: "Historial",
-                  icon: (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
-                    </svg>
-                  ),
-                },
-                {
                   tab: "friends",
                   label: "Amigos",
                   icon: (
@@ -327,6 +347,18 @@ export function HomeClient() {
                       <circle cx="9" cy="7" r="4" />
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  ),
+                },
+                {
+                  tab: "history",
+                  label: "Historial",
+                  icon: (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
                   ),
                 },

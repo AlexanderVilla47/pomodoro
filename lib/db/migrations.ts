@@ -120,6 +120,26 @@ export async function runMigrations(sql: Sql): Promise<void> {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS cheers (
+      id           SERIAL PRIMARY KEY,
+      from_user_id TEXT NOT NULL,
+      to_user_id   TEXT NOT NULL,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      seen_at      TIMESTAMPTZ
+    )
+  `;
+
+  // Un solo aliento PENDIENTE (sin ver) por par emisor→receptor: cada amigo
+  // aporta a lo sumo un aliento a la vez, así el contador en vivo == cantidad de
+  // amigos y nadie puede spamear. Una vez visto (seen_at set), puede volver a
+  // alentar en la próxima sesión.
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS cheers_pending_unique
+      ON cheers (from_user_id, to_user_id)
+      WHERE seen_at IS NULL
+  `;
+
   // Habilita Row Level Security en TODAS las tablas del esquema public sin
   // políticas (deny-all). Supabase expone las tablas public en su API REST con
   // la anon key pública; sin RLS quedan abiertas a lectura/escritura desde

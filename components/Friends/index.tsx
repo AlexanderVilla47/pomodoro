@@ -95,6 +95,8 @@ export function FriendsPanel() {
   const [searchState, setSearchState] = useState<"idle" | "loading" | "done">("idle");
   const [addingId, setAddingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const [cheeredIds, setCheeredIds] = useState<Set<string>>(new Set());
+  const [burstId, setBurstId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const tzOffset = -new Date().getTimezoneOffset();
@@ -178,6 +180,29 @@ export function FriendsPanel() {
   async function handleRemove(id: number) {
     await fetch(`/api/friends/${id}`, { method: "DELETE" });
     load();
+  }
+
+  // Manda un aliento 🔥 a un amigo que está trabajando. Optimista: marca el
+  // botón como enviado enseguida (el backend deduplica igual).
+  async function handleCheer(userId: string) {
+    // Animación de "pop" + fueguito que sube volando.
+    setBurstId(userId);
+    setTimeout(() => setBurstId((cur) => (cur === userId ? null : cur)), 800);
+    setCheeredIds((prev) => new Set(prev).add(userId));
+    try {
+      await fetch("/api/cheers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toUserId: userId }),
+      });
+    } catch {
+      // Si falla, permitir reintentar.
+      setCheeredIds((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    }
   }
 
   const incoming = data?.pending.filter((p) => p.direction === "incoming") ?? [];
@@ -362,10 +387,38 @@ export function FriendsPanel() {
                   </span>
                 </div>
               </div>
+              {friend.presence === "working" && (
+                <button
+                  onClick={() => handleCheer(friend.userId)}
+                  disabled={cheeredIds.has(friend.userId)}
+                  title={cheeredIds.has(friend.userId) ? "¡Aliento enviado!" : "Mandar aliento"}
+                  className={`relative shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-sm transition-all ${
+                    cheeredIds.has(friend.userId)
+                      ? "cursor-default"
+                      : "hover:bg-orange-500/15 hover:scale-110 active:scale-95"
+                  }`}
+                >
+                  <span
+                    className={`inline-block ${burstId === friend.userId ? "animate-cheer-pop" : ""}`}
+                    style={
+                      cheeredIds.has(friend.userId)
+                        ? { filter: "drop-shadow(0 0 5px rgba(249,115,22,0.9))" }
+                        : undefined
+                    }
+                  >
+                    🔥
+                  </span>
+                  {burstId === friend.userId && (
+                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none animate-cheer-rise text-base">
+                      🔥
+                    </span>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => handleRemove(friend.friendshipId)}
                 title="Eliminar amigo"
-                className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
                   <polyline points="3 6 5 6 21 6" />
