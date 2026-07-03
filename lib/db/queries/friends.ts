@@ -22,14 +22,76 @@ export interface PendingRequest {
   direction: "incoming" | "outgoing";
 }
 
-export async function findUserByEmail(
+export type UserRelation = "none" | "pending" | "friend";
+
+export interface UserSearchResult {
+  id: string;
+  name: string;
+  image: string | null;
+  relation: UserRelation;
+}
+
+export async function findUserById(
   sql: Sql,
-  email: string
+  id: string
 ): Promise<{ id: string; name: string; image: string | null } | null> {
   const rows = await sql<Array<{ id: string; name: string; image: string | null }>>`
-    SELECT id, name, image FROM "user" WHERE email = ${email} LIMIT 1
+    SELECT id, name, image FROM "user" WHERE id = ${id} LIMIT 1
   `;
   return rows[0] ?? null;
+}
+
+// Busca usuarios para agregar como amigos. Si el query parece un email, hace
+// match EXACTO (el email es único → desambigua siempre). Si es un nombre, hace
+// búsqueda difusa (ILIKE) que puede devolver varios. En ambos casos excluye al
+// propio usuario y marca la relación existente para que la UI muestre el estado
+// correcto (agregar / pendiente / ya son amigos).
+export async function searchUsers(
+  sql: Sql,
+  query: string,
+  currentUserId: string,
+  limit = 10
+): Promise<UserSearchResult[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q);
+  const cappedLimit = Math.min(Math.max(limit, 1), 25);
+
+  const rows = await sql<Array<UserSearchResult>>`
+    SELECT
+      u.id,
+      u.name,
+      u.image,
+      CASE
+        WHEN fr.status = 'accepted' THEN 'friend'
+        WHEN fr.status = 'pending' THEN 'pending'
+        ELSE 'none'
+      END AS relation
+    FROM "user" u
+    LEFT JOIN LATERAL (
+      SELECT f.status
+      FROM friendships f
+      WHERE (f.requester_id = ${currentUserId} AND f.addressee_id = u.id)
+         OR (f.requester_id = u.id AND f.addressee_id = ${currentUserId})
+      LIMIT 1
+    ) fr ON true
+    WHERE u.id <> ${currentUserId}
+      AND ${
+        isEmail
+          ? sql`lower(u.email) = ${q.toLowerCase()}`
+          : sql`u.name ILIKE ${"%" + q + "%"}`
+      }
+    ORDER BY (fr.status IS NULL) DESC, u.name ASC
+    LIMIT ${cappedLimit}
+  `;
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    image: r.image,
+    relation: r.relation,
+  }));
 }
 
 export async function sendFriendRequest(

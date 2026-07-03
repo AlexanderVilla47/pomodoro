@@ -38,6 +38,15 @@ interface FriendsData {
   pending: PendingRequest[];
 }
 
+type UserRelation = "none" | "pending" | "friend";
+
+interface UserSearchResult {
+  id: string;
+  name: string;
+  image: string | null;
+  relation: UserRelation;
+}
+
 function formatDuration(seconds: number): string {
   if (seconds === 0) return "—";
   const h = Math.floor(seconds / 3600);
@@ -80,10 +89,12 @@ function Avatar({ name, image, size = 32 }: { name: string; image: string | null
 export function FriendsPanel() {
   const [data, setData] = useState<FriendsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [addEmail, setAddEmail] = useState("");
-  const [addState, setAddState] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [addError, setAddError] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<UserSearchResult[]>([]);
+  const [searchState, setSearchState] = useState<"idle" | "loading" | "done">("idle");
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const tzOffset = -new Date().getTimezoneOffset();
@@ -107,35 +118,51 @@ export function FriendsPanel() {
 
   useEffect(() => {
     if (showAddForm) setTimeout(() => inputRef.current?.focus(), 50);
+    else {
+      setQuery("");
+      setResults([]);
+      setSearchState("idle");
+    }
   }, [showAddForm]);
 
-  async function handleAddFriend(e: React.FormEvent) {
-    e.preventDefault();
-    if (!addEmail.trim()) return;
-    setAddState("loading");
-    setAddError("");
+  // Búsqueda con debounce: espera 300ms tras la última tecla antes de pegarle
+  // al backend, así no disparamos un request por cada caracter.
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults([]);
+      setSearchState("idle");
+      return;
+    }
+    setSearchState("loading");
+    const handle = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/friends/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const { results } = await res.json();
+          setResults(results);
+        }
+      } finally {
+        setSearchState("done");
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [query]);
+
+  async function handleAdd(userId: string) {
+    setAddingId(userId);
     try {
       const res = await fetch("/api/friends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: addEmail.trim() }),
+        body: JSON.stringify({ userId }),
       });
-      if (res.ok) {
-        setAddState("success");
-        setAddEmail("");
-        setTimeout(() => {
-          setAddState("idle");
-          setShowAddForm(false);
-          load();
-        }, 1500);
-      } else {
-        const { error } = await res.json();
-        setAddError(error ?? "Error al enviar solicitud");
-        setAddState("error");
+      if (res.ok || res.status === 409) {
+        setSentIds((prev) => new Set(prev).add(userId));
+        load(true);
       }
-    } catch {
-      setAddError("Error de red");
-      setAddState("error");
+    } finally {
+      setAddingId(null);
     }
   }
 
@@ -181,11 +208,7 @@ export function FriendsPanel() {
           Amigos {data && data.friends.length > 0 ? `(${data.friends.length})` : ""}
         </span>
         <button
-          onClick={() => {
-            setShowAddForm((v) => !v);
-            setAddState("idle");
-            setAddError("");
-          }}
+          onClick={() => setShowAddForm((v) => !v)}
           className="flex items-center gap-1 text-xs text-mint hover:text-white transition-colors"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
@@ -198,35 +221,65 @@ export function FriendsPanel() {
         </button>
       </div>
 
-      {/* Add friend form */}
+      {/* Buscar y agregar */}
       {showAddForm && (
-        <form onSubmit={handleAddFriend} className="flex flex-col gap-2 p-3 rounded-xl bg-white/5 border border-white/10 shrink-0">
+        <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/5 border border-white/10 shrink-0">
           <input
             ref={inputRef}
-            type="email"
-            value={addEmail}
-            onChange={(e) => { setAddEmail(e.target.value); setAddState("idle"); setAddError(""); }}
-            placeholder="Email del amigo"
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre o email"
             className="bg-transparent text-sm text-white placeholder:text-white/30 outline-none border-b border-white/10 pb-1 focus:border-mint transition-colors"
           />
-          {addError && <span className="text-xs text-red-400">{addError}</span>}
-          <div className="flex gap-2 justify-end">
+
+          {searchState === "loading" && (
+            <span className="text-xs text-white/30 py-1">Buscando…</span>
+          )}
+
+          {searchState === "done" && results.length === 0 && (
+            <span className="text-xs text-white/30 py-1">
+              Nadie coincide. Probá con el email exacto.
+            </span>
+          )}
+
+          {results.length > 0 && (
+            <div className="flex flex-col gap-1 max-h-56 overflow-y-auto no-scrollbar">
+              {results.map((u) => {
+                const alreadySent = u.relation !== "none" || sentIds.has(u.id);
+                const label =
+                  u.relation === "friend"
+                    ? "Amigos"
+                    : u.relation === "pending" || sentIds.has(u.id)
+                      ? "Pendiente"
+                      : "Agregar";
+                return (
+                  <div key={u.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-white/5 transition-colors">
+                    <Avatar name={u.name} image={u.image} size={28} />
+                    <span className="flex-1 text-sm text-white/80 truncate">{u.name}</span>
+                    <button
+                      onClick={() => handleAdd(u.id)}
+                      disabled={alreadySent || addingId === u.id}
+                      className="text-xs px-2.5 py-1 rounded-lg bg-mint/20 text-mint hover:bg-mint/30 transition-colors disabled:opacity-40 disabled:hover:bg-mint/20"
+                    >
+                      {addingId === u.id ? "…" : label}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => setShowAddForm(false)}
               className="text-xs text-white/30 hover:text-white/60 transition-colors px-2 py-1"
             >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={addState === "loading" || addState === "success"}
-              className="text-xs px-3 py-1 rounded-lg bg-mint/20 text-mint hover:bg-mint/30 transition-colors disabled:opacity-50"
-            >
-              {addState === "loading" ? "Enviando..." : addState === "success" ? "¡Enviada!" : "Enviar solicitud"}
+              Cerrar
             </button>
           </div>
-        </form>
+        </div>
       )}
 
       {/* Incoming requests */}

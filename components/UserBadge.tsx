@@ -2,11 +2,22 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth/client";
+
+const MAX_NAME_LENGTH = 50;
 
 export function UserBadge({ className, compact }: { className?: string; compact?: boolean }) {
   const { data: session } = authClient.useSession();
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) setTimeout(() => editInputRef.current?.focus(), 50);
+  }, [editing]);
 
   if (!session?.user) return null;
 
@@ -19,6 +30,28 @@ export function UserBadge({ className, compact }: { className?: string; compact?
         .slice(0, 2)
         .toUpperCase()
     : (email?.[0]?.toUpperCase() ?? "?");
+
+  function startEditing() {
+    setNameInput(name ?? "");
+    setEditing(true);
+  }
+
+  async function handleSaveName() {
+    const trimmed = nameInput.trim();
+    // Sin cambios o vacío → no tocamos nada, salimos del modo edición.
+    if (!trimmed || trimmed === name) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await authClient.updateUser({ name: trimmed.slice(0, MAX_NAME_LENGTH) });
+      setEditing(false);
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleSignOut() {
     await authClient.signOut();
@@ -57,7 +90,29 @@ export function UserBadge({ className, compact }: { className?: string; compact?
           {initials}
         </div>
       )}
-      <span className="text-xs text-white/60 flex-1 truncate">{name ?? email}</span>
+      {editing ? (
+        <input
+          ref={editInputRef}
+          value={nameInput}
+          maxLength={MAX_NAME_LENGTH}
+          disabled={saving}
+          onChange={(e) => setNameInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSaveName();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          onBlur={handleSaveName}
+          className="text-xs text-white bg-transparent flex-1 min-w-0 outline-none border-b border-mint/50 pb-0.5"
+        />
+      ) : (
+        <button
+          onClick={startEditing}
+          title="Cambiar nombre"
+          className="text-xs text-white/60 hover:text-white flex-1 truncate text-left transition-colors"
+        >
+          {name ?? email}
+        </button>
+      )}
       <button
         onClick={handleSignOut}
         className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0"

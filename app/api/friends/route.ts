@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/index";
 import { getSession } from "@/lib/auth/session";
 import {
-  findUserByEmail,
+  findUserById,
   sendFriendRequest,
   getFriendsWithStats,
   getPendingRequests,
@@ -31,21 +31,21 @@ export async function POST(req: Request) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : null;
+  const userId = typeof body?.userId === "string" ? body.userId.trim() : null;
 
-  if (!email) {
-    return Response.json({ error: "Email requerido" }, { status: 400 });
+  if (!userId) {
+    return Response.json({ error: "userId requerido" }, { status: 400 });
   }
 
-  if (email === session.user.email?.toLowerCase()) {
+  if (userId === session.user.id) {
     return Response.json({ error: "No podés agregarte a vos mismo" }, { status: 400 });
   }
 
   const db = getDb();
-  const target = await findUserByEmail(db, email);
+  const target = await findUserById(db, userId);
 
   if (!target) {
-    return Response.json({ error: "No existe ningún usuario con ese email" }, { status: 404 });
+    return Response.json({ error: "No existe ese usuario" }, { status: 404 });
   }
 
   const already = await areFriends(db, session.user.id, target.id);
