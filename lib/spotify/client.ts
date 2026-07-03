@@ -190,3 +190,69 @@ export async function getPlaylistTracks(
 
   return tracks;
 }
+
+// Parsea el `context.uri` que devuelve el reproductor (ej: "spotify:album:X").
+// Solo soportamos playlist y álbum, que son contextos con una lista ordenada
+// que podemos expandir. artist/collection/radio no tienen una lista fija.
+export function parseContextUri(
+  uri: string
+): { type: "playlist" | "album"; id: string } | null {
+  const match = /^spotify:(playlist|album):([A-Za-z0-9]+)$/.exec(uri);
+  if (!match) return null;
+  return { type: match[1] as "playlist" | "album", id: match[2] };
+}
+
+export async function getAlbumTracks(
+  accessToken: string,
+  albumId: string
+): Promise<SpotifyTrack[]> {
+  const headers = { Authorization: `Bearer ${accessToken}` };
+
+  // El álbum trae la portada y la primera página de tracks. Los tracks del
+  // endpoint de álbum vienen "simplificados" (sin imagen propia), así que le
+  // aplicamos la portada del álbum a todos.
+  const albumRes = await fetch(`${API_URL}/albums/${albumId}`, { headers });
+  if (!albumRes.ok) throw new Error(`Spotify album fetch failed: ${albumRes.status}`);
+  const album = await albumRes.json();
+  const cover: string | null = album.images?.[0]?.url ?? null;
+
+  const tracks: SpotifyTrack[] = [];
+  const pushItems = (items: Record<string, unknown>[]) => {
+    for (const t of items) {
+      if (!t || !t.uri) continue;
+      tracks.push({
+        uri: t.uri as string,
+        id: t.id as string,
+        name: t.name as string,
+        artistName: ((t.artists as { name: string }[])?.[0]?.name) ?? "",
+        durationMs: t.duration_ms as number,
+        imageUrl: cover,
+      });
+    }
+  };
+
+  pushItems(album.tracks?.items ?? []);
+  let next: string | null = album.tracks?.next ?? null;
+  while (next) {
+    const res: Response = await fetch(next, { headers });
+    if (!res.ok) throw new Error(`Spotify album tracks fetch failed: ${res.status}`);
+    const data = await res.json();
+    pushItems(data.items ?? []);
+    next = data.next ?? null;
+  }
+
+  return tracks;
+}
+
+// Expande el contexto actualmente en reproducción a su lista completa de tracks.
+// Devuelve null si el contexto no es expandible (radio, artista, tema suelto),
+// para que la UI caiga a su fallback.
+export async function getContextTracks(
+  accessToken: string,
+  contextUri: string
+): Promise<SpotifyTrack[] | null> {
+  const ctx = parseContextUri(contextUri);
+  if (!ctx) return null;
+  if (ctx.type === "playlist") return getPlaylistTracks(accessToken, ctx.id);
+  return getAlbumTracks(accessToken, ctx.id);
+}

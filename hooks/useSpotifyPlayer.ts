@@ -40,6 +40,10 @@ interface SpotifyPlayerState {
   paused: boolean;
   position: number;
   duration: number;
+  shuffle: boolean;
+  context: {
+    uri: string | null;
+  };
   track_window: {
     current_track: SpotifySDKTrack;
     next_tracks: SpotifySDKTrack[];
@@ -59,6 +63,8 @@ export function useSpotifyPlayer() {
   const [currentTrackName, setCurrentTrackName] = useState<string | null>(null);
   const [currentArtistName, setCurrentArtistName] = useState<string | null>(null);
   const [nextTracks, setNextTracks] = useState<SpotifySDKTrack[]>([]);
+  const [contextUri, setContextUri] = useState<string | null>(null);
+  const [shuffle, setShuffle] = useState(false);
   const urisRef = useRef<string[]>([]);
   const currentIndexRef = useRef(0);
 
@@ -113,6 +119,8 @@ export function useSpotifyPlayer() {
         setCurrentTrackName(track.name);
         setCurrentArtistName(track.artists[0]?.name ?? null);
         setNextTracks(s.track_window.next_tracks ?? []);
+        setContextUri(s.context?.uri ?? null);
+        setShuffle(Boolean(s.shuffle));
         const idx = urisRef.current.indexOf(track.uri);
         if (idx >= 0) currentIndexRef.current = idx;
       });
@@ -162,6 +170,36 @@ export function useSpotifyPlayer() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ uris, offset: { position: startIndex } }),
+        }
+      );
+    },
+    [getToken]
+  );
+
+  // Salta a un tema DENTRO del contexto actual (álbum/playlist). A diferencia de
+  // loadAndPlay (que manda URIs crudas y borra el contexto), acá pasamos
+  // context_uri + offset, así Spotify mantiene "de qué playlist/álbum" viene la
+  // reproducción y la cola/aleatorio siguen coherentes.
+  // Usamos offset por URI (no por índice) porque nuestra lista puede saltear
+  // temas sin uri (locales/no disponibles), y un índice desfasado haría sonar
+  // el tema equivocado. Por uri, Spotify elige el tema exacto.
+  const playContext = useCallback(
+    async (contextUri: string, trackUri: string) => {
+      if (!deviceIdRef.current) return;
+      const token = await getToken();
+      if (!token) return;
+      await fetch(
+        `https://api.spotify.com/v1/me/player/play?device_id=${deviceIdRef.current}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            context_uri: contextUri,
+            offset: { uri: trackUri },
+          }),
         }
       );
     },
@@ -220,8 +258,11 @@ export function useSpotifyPlayer() {
     currentTrackName,
     currentArtistName,
     nextTracks,
+    contextUri,
+    shuffle,
     initSDK,
     loadAndPlay,
+    playContext,
     play,
     pause,
     next,
