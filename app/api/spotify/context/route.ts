@@ -1,6 +1,11 @@
 import { getSession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/index";
-import { getAccessToken, getContextTracks } from "@/lib/spotify/client";
+import {
+  callSpotify,
+  getContextTracks,
+  SpotifyApiError,
+  SpotifyNotConnectedError,
+} from "@/lib/spotify/client";
 
 // Expande el contexto en reproducción (playlist/álbum) a su lista completa de
 // tracks, para mostrarla clickeable. Si el contexto no es expandible (radio,
@@ -14,16 +19,23 @@ export async function GET(req: Request) {
   if (!uri) return Response.json({ error: "uri requerido" }, { status: 400 });
 
   const sql = getDb();
-  const accessToken = await getAccessToken(sql, session.user.id);
-  if (!accessToken) return Response.json({ error: "Not connected" }, { status: 401 });
 
   try {
-    const tracks = await getContextTracks(accessToken, uri);
+    const tracks = await callSpotify(sql, session.user.id, (token) =>
+      getContextTracks(token, uri)
+    );
     if (tracks === null) {
       return Response.json({ supported: false, tracks: [] });
     }
     return Response.json({ supported: true, tracks });
-  } catch {
-    return Response.json({ error: "fetch_failed" }, { status: 502 });
+  } catch (e) {
+    if (e instanceof SpotifyNotConnectedError) {
+      return Response.json({ error: "Not connected" }, { status: 401 });
+    }
+    // Exponemos el status real de Spotify para poder diagnosticar en vez de
+    // devolver un 502 opaco.
+    const spotifyStatus = e instanceof SpotifyApiError ? e.status : null;
+    console.error("[spotify/context] fetch failed", spotifyStatus, e);
+    return Response.json({ error: "fetch_failed", spotifyStatus }, { status: 502 });
   }
 }

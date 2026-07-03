@@ -2,21 +2,29 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db/index", () => ({ getDb: () => ({}) }));
 vi.mock("@/lib/auth/session", () => ({
-  getSession: vi.fn().mockResolvedValue({
-    user: { id: "me", email: "me@test.com" },
-    session: { id: "s" },
-  }),
+  getSession: vi.fn(),
 }));
-vi.mock("@/lib/spotify/client", () => ({
-  getAccessToken: vi.fn(),
-  getContextTracks: vi.fn(),
-}));
+// Mockeamos solo las funciones; conservamos las clases de error reales para que
+// los `instanceof` de la ruta funcionen.
+vi.mock("@/lib/spotify/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/spotify/client")>();
+  return {
+    ...actual,
+    callSpotify: vi.fn(),
+    getContextTracks: vi.fn(),
+  };
+});
 
 import { GET } from "../spotify/context/route";
-import { getAccessToken, getContextTracks } from "@/lib/spotify/client";
+import {
+  callSpotify,
+  getContextTracks,
+  SpotifyApiError,
+  SpotifyNotConnectedError,
+} from "@/lib/spotify/client";
 import { getSession } from "@/lib/auth/session";
 
-const mockToken = vi.mocked(getAccessToken);
+const mockCall = vi.mocked(callSpotify);
 const mockContext = vi.mocked(getContextTracks);
 const mockSession = vi.mocked(getSession);
 
@@ -31,7 +39,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockSession.mockResolvedValue({ user: { id: "me" }, session: { id: "s" } } as any);
-  mockToken.mockResolvedValue("token-123");
+  // Por defecto callSpotify ejecuta el callback con un token dummy.
+  mockCall.mockImplementation((_sql, _uid, fn) => fn("token-123"));
   mockContext.mockResolvedValue([]);
 });
 
@@ -48,7 +57,7 @@ describe("GET /api/spotify/context", () => {
   });
 
   it("retorna 401 si no hay cuenta de Spotify conectada", async () => {
-    mockToken.mockResolvedValueOnce(null);
+    mockCall.mockRejectedValueOnce(new SpotifyNotConnectedError());
     const res = await GET(req("spotify:album:abc"));
     expect(res.status).toBe(401);
   });
@@ -74,9 +83,11 @@ describe("GET /api/spotify/context", () => {
     expect(body.tracks).toEqual([]);
   });
 
-  it("retorna 502 si la Spotify API falla", async () => {
-    mockContext.mockRejectedValueOnce(new Error("boom"));
+  it("retorna 502 con el status real de Spotify cuando la API falla", async () => {
+    mockCall.mockRejectedValueOnce(new SpotifyApiError(403, "forbidden"));
     const res = await GET(req("spotify:album:abc"));
     expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.spotifyStatus).toBe(403);
   });
 });

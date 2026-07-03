@@ -1,6 +1,11 @@
 import { getSession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/index";
-import { getAccessToken, getPlaylists } from "@/lib/spotify/client";
+import {
+  callSpotify,
+  getPlaylists,
+  SpotifyApiError,
+  SpotifyNotConnectedError,
+} from "@/lib/spotify/client";
 
 export async function GET() {
   const session = await getSession();
@@ -8,19 +13,20 @@ export async function GET() {
 
   const sql = getDb();
 
-  let accessToken: string | null;
   try {
-    accessToken = await getAccessToken(sql, session.user.id);
-  } catch {
-    return Response.json({ connected: false }, { status: 200 });
-  }
-
-  if (!accessToken) return Response.json({ connected: false }, { status: 200 });
-
-  try {
-    const playlists = await getPlaylists(accessToken);
+    const playlists = await callSpotify(sql, session.user.id, (token) =>
+      getPlaylists(token)
+    );
     return Response.json({ connected: true, playlists });
-  } catch {
-    return Response.json({ connected: true, playlists: [], error: "fetch_failed" });
+  } catch (e) {
+    if (e instanceof SpotifyNotConnectedError) {
+      return Response.json({ connected: false }, { status: 200 });
+    }
+    const spotifyStatus = e instanceof SpotifyApiError ? e.status : null;
+    console.error("[spotify/playlists] fetch failed", spotifyStatus, e);
+    return Response.json(
+      { connected: true, playlists: [], error: "fetch_failed", spotifyStatus },
+      { status: 200 }
+    );
   }
 }

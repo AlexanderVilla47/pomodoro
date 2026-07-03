@@ -1,10 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { parseContextUri, getAlbumTracks, getContextTracks } from "../client";
+import {
+  parseContextUri,
+  getAlbumTracks,
+  getContextTracks,
+  getPlaylists,
+  callSpotify,
+  SpotifyApiError,
+  SpotifyNotConnectedError,
+} from "../client";
 
 const TOKEN = "test-token";
 
 function makeResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body, text: async () => JSON.stringify(body) };
+}
+
+// sql fake: cada tag call devuelve las filas dadas (el UPDATE ignora el result).
+function makeSql(rows: unknown[]) {
+  const tag = vi.fn(() => Promise.resolve(rows)) as unknown;
+  (tag as Record<string, unknown>).unsafe = vi.fn();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return tag as any;
 }
 
 function albumTrack(id: string, name: string) {
@@ -97,6 +113,67 @@ describe("getAlbumTracks", () => {
 
     expect(tracks.map((t) => t.id)).toEqual(["t1", "t2"]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("SpotifyApiError propagation", () => {
+  it("getPlaylists lanza SpotifyApiError con el status real en un fallo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(makeResponse({ error: "unauthorized" }, false, 401))
+    );
+
+    await expect(getPlaylists(TOKEN)).rejects.toMatchObject({
+      name: "SpotifyApiError",
+      status: 401,
+    });
+  });
+
+  it("getAlbumTracks lanza SpotifyApiError con el status en un 403", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(makeResponse({ error: "forbidden" }, false, 403))
+    );
+
+    await expect(getAlbumTracks(TOKEN, "album1")).rejects.toBeInstanceOf(SpotifyApiError);
+  });
+});
+
+describe("callSpotify", () => {
+  it("lanza SpotifyNotConnectedError si no hay token en la DB", async () => {
+    const sql = makeSql([]); // sin filas → no conectado
+    await expect(callSpotify(sql, "u", async () => "nunca")).rejects.toBeInstanceOf(
+      SpotifyNotConnectedError
+    );
+  });
+
+  it("reintenta forzando refresh cuando la llamada devuelve 401", async () => {
+    // Token en DB válido (no vence) → primera llamada usa "old".
+    const sql = makeSql([
+      {
+        access_token: "old",
+        refresh_token: "r",
+        expires_at: new Date(Date.now() + 3600_000),
+      },
+    ]);
+    // El refresh (forzado en el retry) pega a accounts.spotify.com y devuelve "new".
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(makeResponse({ access_token: "new", expires_in: 3600 }))
+    );
+
+    let attempt = 0;
+    const fn = vi.fn(async (token: string) => {
+      attempt++;
+      if (attempt === 1) throw new SpotifyApiError(401, "expired");
+      return `ok-${token}`;
+    });
+
+    const result = await callSpotify(sql, "u", fn);
+
+    expect(result).toBe("ok-new");
+    expect(fn).toHaveBeenNthCalledWith(1, "old");
+    expect(fn).toHaveBeenNthCalledWith(2, "new");
   });
 });
 

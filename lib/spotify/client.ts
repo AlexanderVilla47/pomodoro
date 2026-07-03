@@ -28,6 +28,58 @@ function clientSecret() {
   return process.env.SPOTIFY_CLIENT_SECRET!;
 }
 
+// Error que preserva el status HTTP y el cuerpo de la respuesta de Spotify, así
+// las rutas pueden decidir (ej: reintentar en 401) y exponer el status real para
+// diagnosticar en vez de tragarse el error.
+export class SpotifyApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly body: string
+  ) {
+    super(`Spotify API ${status}`);
+    this.name = "SpotifyApiError";
+  }
+}
+
+export class SpotifyNotConnectedError extends Error {
+  constructor() {
+    super("Spotify not connected");
+    this.name = "SpotifyNotConnectedError";
+  }
+}
+
+async function spotifyFetch(accessToken: string, url: string): Promise<Response> {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new SpotifyApiError(res.status, body);
+  }
+  return res;
+}
+
+// Ejecuta una llamada a la Web API con manejo de token: si Spotify responde 401
+// (token vencido/inválido pese a lo que dice expires_at), fuerza un refresh y
+// reintenta UNA vez. Lanza SpotifyNotConnectedError si no hay cuenta conectada.
+export async function callSpotify<T>(
+  sql: Sql,
+  userId: string,
+  fn: (accessToken: string) => Promise<T>
+): Promise<T> {
+  const token = await getAccessToken(sql, userId);
+  if (!token) throw new SpotifyNotConnectedError();
+  try {
+    return await fn(token);
+  } catch (e) {
+    if (e instanceof SpotifyApiError && e.status === 401) {
+      const fresh = await getAccessToken(sql, userId, true);
+      if (fresh) return await fn(fresh);
+    }
+    throw e;
+  }
+}
+
 export function getAuthUrl(redirectUri: string, state: string): string {
   const scopes = [
     "streaming",
@@ -81,7 +133,7 @@ export async function exchangeCode(
 
 async function refreshAccessToken(
   refreshToken: string
-): Promise<{ accessToken: string; expiresAt: Date }> {
+): Promise<{ accessToken: string; refreshToken: string; expiresAt: Date }> {
   const res = await fetch(`${ACCOUNTS_URL}/api/token`, {
     method: "POST",
     headers: {
@@ -94,11 +146,17 @@ async function refreshAccessToken(
     }),
   });
 
-  if (!res.ok) throw new Error("Spotify token refresh failed");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new SpotifyApiError(res.status, body);
+  }
 
   const data = await res.json();
   return {
     accessToken: data.access_token,
+    // Spotify a veces rota el refresh_token; si viene uno nuevo hay que guardarlo,
+    // si no seguimos con el que teníamos.
+    refreshToken: data.refresh_token ?? refreshToken,
     expiresAt: new Date(Date.now() + data.expires_in * 1000),
   };
 }
@@ -124,7 +182,11 @@ export async function deleteTokens(sql: Sql, userId: string): Promise<void> {
   await sql`DELETE FROM spotify_tokens WHERE user_id = ${userId}`;
 }
 
-export async function getAccessToken(sql: Sql, userId: string): Promise<string | null> {
+export async function getAccessToken(
+  sql: Sql,
+  userId: string,
+  forceRefresh = false
+): Promise<string | null> {
   const rows = await sql<
     { access_token: string; refresh_token: string; expires_at: Date }[]
   >`SELECT access_token, refresh_token, expires_at FROM spotify_tokens WHERE user_id = ${userId}`;
@@ -133,11 +195,14 @@ export async function getAccessToken(sql: Sql, userId: string): Promise<string |
 
   const { access_token, refresh_token, expires_at } = rows[0];
 
-  // Refresh if expires within 60 seconds
-  if (new Date(expires_at).getTime() - Date.now() < 60_000) {
+  // Refresca si se fuerza (ej: tras un 401) o si vence dentro de 60 segundos.
+  if (forceRefresh || new Date(expires_at).getTime() - Date.now() < 60_000) {
     const refreshed = await refreshAccessToken(refresh_token);
     await sql`
-      UPDATE spotify_tokens SET access_token = ${refreshed.accessToken}, expires_at = ${refreshed.expiresAt}
+      UPDATE spotify_tokens
+      SET access_token = ${refreshed.accessToken},
+          refresh_token = ${refreshed.refreshToken},
+          expires_at = ${refreshed.expiresAt}
       WHERE user_id = ${userId}
     `;
     return refreshed.accessToken;
@@ -147,10 +212,7 @@ export async function getAccessToken(sql: Sql, userId: string): Promise<string |
 }
 
 export async function getPlaylists(accessToken: string): Promise<SpotifyPlaylist[]> {
-  const res = await fetch(`${API_URL}/me/playlists?limit=50`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error("Failed to fetch Spotify playlists");
+  const res = await spotifyFetch(accessToken, `${API_URL}/me/playlists?limit=50`);
   const data = await res.json();
   return data.items.map((p: Record<string, unknown>) => ({
     id: p.id as string,
@@ -168,10 +230,7 @@ export async function getPlaylistTracks(
   let url: string | null = `${API_URL}/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,uri,name,duration_ms,artists,album(images)))`;
 
   while (url) {
-    const res: Response = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) throw new Error(`Spotify tracks fetch failed: ${res.status}`);
+    const res: Response = await spotifyFetch(accessToken, url);
     const data = await res.json();
     for (const item of data.items) {
       const t = item.track;
@@ -206,13 +265,10 @@ export async function getAlbumTracks(
   accessToken: string,
   albumId: string
 ): Promise<SpotifyTrack[]> {
-  const headers = { Authorization: `Bearer ${accessToken}` };
-
   // El álbum trae la portada y la primera página de tracks. Los tracks del
   // endpoint de álbum vienen "simplificados" (sin imagen propia), así que le
   // aplicamos la portada del álbum a todos.
-  const albumRes = await fetch(`${API_URL}/albums/${albumId}`, { headers });
-  if (!albumRes.ok) throw new Error(`Spotify album fetch failed: ${albumRes.status}`);
+  const albumRes = await spotifyFetch(accessToken, `${API_URL}/albums/${albumId}`);
   const album = await albumRes.json();
   const cover: string | null = album.images?.[0]?.url ?? null;
 
@@ -234,8 +290,7 @@ export async function getAlbumTracks(
   pushItems(album.tracks?.items ?? []);
   let next: string | null = album.tracks?.next ?? null;
   while (next) {
-    const res: Response = await fetch(next, { headers });
-    if (!res.ok) throw new Error(`Spotify album tracks fetch failed: ${res.status}`);
+    const res: Response = await spotifyFetch(accessToken, next);
     const data = await res.json();
     pushItems(data.items ?? []);
     next = data.next ?? null;
