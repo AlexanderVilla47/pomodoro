@@ -29,6 +29,14 @@ export function CheerPulse() {
 
     poll();
     const id = setInterval(poll, 12_000);
+    // En mobile el navegador CONGELA setInterval cuando la pestaña pasa a
+    // segundo plano (pantalla bloqueada durante el foco). Al volver, el poll
+    // no reanuda solo y el chip queda colgado con un conteo viejo. Re-consultamos
+    // apenas la pestaña vuelve a estar visible para reflejar la verdad del server.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     // Al revelar los nombres (fin de sesión) se marcan vistos → reseteamos ya.
     const reset = () => {
       setCount(0);
@@ -37,6 +45,7 @@ export function CheerPulse() {
     window.addEventListener("cheers-seen", reset);
     return () => {
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("cheers-seen", reset);
     };
   }, []);
