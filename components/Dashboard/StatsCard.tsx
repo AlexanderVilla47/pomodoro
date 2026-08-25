@@ -7,6 +7,7 @@ interface StatsCardProps {
   label: string;
   count: number;
   totalSeconds: number;
+  distractionCount?: number;
   isLoading?: boolean;
 }
 
@@ -17,7 +18,7 @@ function formatDuration(seconds: number): string {
   return `${m}m`;
 }
 
-export function StatsCard({ label, count, totalSeconds, isLoading }: StatsCardProps) {
+export function StatsCard({ label, count, totalSeconds, distractionCount = 0, isLoading }: StatsCardProps) {
   const countRef = useRef<HTMLSpanElement>(null);
   const prevCount = useRef(count);
 
@@ -54,7 +55,17 @@ export function StatsCard({ label, count, totalSeconds, isLoading }: StatsCardPr
         </span>
         <span className="text-xs text-white/40">sesiones</span>
       </div>
-      <span className="text-xs text-white/60">{formatDuration(totalSeconds)}</span>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-xs text-white/60">{formatDuration(totalSeconds)}</span>
+        {distractionCount > 0 && (
+          <>
+            <span className="text-[10px] text-white/25">·</span>
+            <span data-testid="stats-distractions" className="text-[10px] text-coral">
+              {distractionCount} {distractionCount === 1 ? "corte" : "cortes"}
+            </span>
+          </>
+        )}
+      </div>
     </div>
   );
 }

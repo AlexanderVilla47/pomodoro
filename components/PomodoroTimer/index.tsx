@@ -9,13 +9,26 @@ import { TimerLabel } from "./TimerLabel";
 import { SessionProgress } from "./SessionProgress";
 import { TimerControls } from "./TimerControls";
 import { QuoteDisplay } from "./QuoteDisplay";
+import { DistractionButton } from "./DistractionButton";
 
 interface PomodoroTimerProps {
   labelColor?: string;
 }
 
 export function PomodoroTimer({ labelColor }: PomodoroTimerProps) {
-  const { status, phase, sessionCount, remaining, start, pause, resume, stop, skip } = useTimer();
+  const {
+    status,
+    phase,
+    sessionCount,
+    remaining,
+    distractionCount,
+    start,
+    pause,
+    resume,
+    stop,
+    skip,
+    markDistraction,
+  } = useTimer();
   const { settings } = useSettings();
   const containerRef = useRef<HTMLDivElement>(null);
   const prevPhaseRef = useRef(phase);
@@ -100,6 +113,9 @@ export function PomodoroTimer({ labelColor }: PomodoroTimerProps) {
         onStop={stop}
         onSkip={skip}
       />
+      {status === "running" && phase === "work" && (
+        <DistractionButton count={distractionCount} onMark={markDistraction} />
+      )}
       <QuoteDisplay phase={phase} status={status} />
     </div>
   );

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { StatsCard } from "./StatsCard";
 
 interface Stats {
-  today: { count: number; total_seconds: number };
-  week: { count: number; total_seconds: number };
+  today: { count: number; total_seconds: number; distraction_count: number };
+  week: { count: number; total_seconds: number; distraction_count: number };
 }
 
 
@@ -39,12 +39,14 @@ export function Dashboard({ refreshTrigger }: DashboardProps) {
           label="Hoy"
           count={today?.count ?? 0}
           totalSeconds={today?.total_seconds ?? 0}
+          distractionCount={today?.distraction_count ?? 0}
           isLoading={today === null}
         />
         <StatsCard
           label="Esta semana"
           count={week?.count ?? 0}
           totalSeconds={week?.total_seconds ?? 0}
+          distractionCount={week?.distraction_count ?? 0}
           isLoading={week === null}
         />
       </div>

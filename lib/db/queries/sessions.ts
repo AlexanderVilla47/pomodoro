@@ -12,11 +12,14 @@ export interface NewSession {
   actual_duration: number;
   completed: boolean;
   label_id?: number | null;
+  distraction_count?: number;
+  distraction_marks?: number[];
 }
 
 export interface SessionStats {
   count: number;
   total_seconds: number;
+  distraction_count: number;
 }
 
 export interface DayStats {
@@ -26,7 +29,7 @@ export interface DayStats {
 
 export async function insertSession(sql: Sql, userId: string, data: NewSession): Promise<number> {
   const [row] = await sql<[{ id: number }]>`
-    INSERT INTO sessions (user_id, type, started_at, ended_at, planned_duration, actual_duration, completed, label_id)
+    INSERT INTO sessions (user_id, type, started_at, ended_at, planned_duration, actual_duration, completed, label_id, distraction_count, distraction_marks)
     VALUES (
       ${userId},
       ${data.type},
@@ -35,39 +38,53 @@ export async function insertSession(sql: Sql, userId: string, data: NewSession):
       ${data.planned_duration},
       ${data.actual_duration},
       ${data.completed ? 1 : 0},
-      ${data.label_id ?? null}
+      ${data.label_id ?? null},
+      ${data.distraction_count ?? 0},
+      ${data.distraction_marks ?? []}
     )
     RETURNING id
   `;
   return row.id;
 }
 
+type StatsRow = { count: number; total_seconds: number; distraction_count: number };
+
+function toStats(row: StatsRow): SessionStats {
+  return {
+    count: Number(row.count),
+    total_seconds: Number(row.total_seconds),
+    distraction_count: Number(row.distraction_count),
+  };
+}
+
 export async function getStatsForToday(sql: Sql, userId: string, tzOffsetMinutes: number): Promise<SessionStats> {
-  const [row] = await sql<[{ count: number; total_seconds: number }]>`
+  const [row] = await sql<[StatsRow]>`
     SELECT
       COUNT(*)::int AS count,
-      COALESCE(SUM(actual_duration), 0)::int AS total_seconds
+      COALESCE(SUM(actual_duration), 0)::int AS total_seconds,
+      COALESCE(SUM(distraction_count), 0)::int AS distraction_count
     FROM sessions
     WHERE user_id = ${userId}
       AND type = 'work'
       AND (started_at + make_interval(mins => ${tzOffsetMinutes}))::date
           = (NOW() + make_interval(mins => ${tzOffsetMinutes}))::date
   `;
-  return { count: Number(row.count), total_seconds: Number(row.total_seconds) };
+  return toStats(row);
 }
 
 export async function getStatsForWeek(sql: Sql, userId: string, tzOffsetMinutes: number): Promise<SessionStats> {
-  const [row] = await sql<[{ count: number; total_seconds: number }]>`
+  const [row] = await sql<[StatsRow]>`
     SELECT
       COUNT(*)::int AS count,
-      COALESCE(SUM(actual_duration), 0)::int AS total_seconds
+      COALESCE(SUM(actual_duration), 0)::int AS total_seconds,
+      COALESCE(SUM(distraction_count), 0)::int AS distraction_count
     FROM sessions
     WHERE user_id = ${userId}
       AND type = 'work'
       AND (started_at + make_interval(mins => ${tzOffsetMinutes}))::date
           >= (date_trunc('week', (NOW() + make_interval(mins => ${tzOffsetMinutes}))::date + interval '1 day') - interval '1 day')::date
   `;
-  return { count: Number(row.count), total_seconds: Number(row.total_seconds) };
+  return toStats(row);
 }
 
 export async function getDailyStatsForYear(

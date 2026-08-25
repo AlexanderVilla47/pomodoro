@@ -17,6 +17,7 @@ export interface WorkLogRow {
   session_type: string;
   started_at: string;
   actual_duration: number;
+  distraction_count: number;
   label_id: number | null;
   label_name: string | null;
   label_color: string | null;
@@ -76,6 +77,7 @@ export async function getWorkLogs(
       s.type             AS session_type,
       s.started_at::text AS started_at,
       s.actual_duration,
+      s.distraction_count,
       l.id               AS label_id,
       l.name             AS label_name,
       l.color            AS label_color

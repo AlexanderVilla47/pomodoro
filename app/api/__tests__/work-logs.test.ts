@@ -90,6 +90,7 @@ describe("GET /api/work-logs", () => {
       id: 1, session_id: 2, notes: "n", topics: [],
       created_at: "2026-01-01T10:00:00Z", session_type: "work",
       started_at: "2026-01-01T10:00:00Z", actual_duration: 1500,
+      distraction_count: 0,
       label_id: null, label_name: null, label_color: null,
     };
     mockGet.mockResolvedValueOnce([fakeLog]);

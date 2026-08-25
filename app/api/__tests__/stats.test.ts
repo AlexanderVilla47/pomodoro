@@ -20,8 +20,8 @@ const mockWeek = vi.mocked(getStatsForWeek);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockToday.mockResolvedValue({ count: 0, total_seconds: 0 });
-  mockWeek.mockResolvedValue({ count: 0, total_seconds: 0 });
+  mockToday.mockResolvedValue({ count: 0, total_seconds: 0, distraction_count: 0 });
+  mockWeek.mockResolvedValue({ count: 0, total_seconds: 0, distraction_count: 0 });
 });
 
 describe("GET /api/stats", () => {
@@ -37,14 +37,23 @@ describe("GET /api/stats", () => {
   });
 
   it("retorna los datos que proveen las queries", async () => {
-    mockToday.mockResolvedValue({ count: 1, total_seconds: 1500 });
-    mockWeek.mockResolvedValue({ count: 3, total_seconds: 4500 });
+    mockToday.mockResolvedValue({ count: 1, total_seconds: 1500, distraction_count: 2 });
+    mockWeek.mockResolvedValue({ count: 3, total_seconds: 4500, distraction_count: 7 });
     const req = new Request("http://localhost/api/stats");
     const res = await GET(req);
     const body = await res.json();
     expect(body.today.count).toBe(1);
     expect(body.today.total_seconds).toBe(1500);
     expect(body.week.count).toBe(3);
+  });
+
+  it("expone las distracciones acumuladas de hoy y de la semana", async () => {
+    mockToday.mockResolvedValue({ count: 1, total_seconds: 1500, distraction_count: 2 });
+    mockWeek.mockResolvedValue({ count: 3, total_seconds: 4500, distraction_count: 7 });
+    const req = new Request("http://localhost/api/stats");
+    const body = await (await GET(req)).json();
+    expect(body.today.distraction_count).toBe(2);
+    expect(body.week.distraction_count).toBe(7);
   });
 
   it("sin parámetro tz llama a las queries con offset 0", async () => {

@@ -136,6 +136,14 @@ export function Historial({ refreshTrigger, onViewChange, cellSize, confirmTap }
                       <span className="text-[10px] text-white/30">{formatTime(log.started_at)}</span>
                       <span className="text-[10px] text-white/30">·</span>
                       <span className="text-[10px] text-white/50">{fmtTime(log.actual_duration)}</span>
+                      {log.distraction_count > 0 && (
+                        <>
+                          <span className="text-[10px] text-white/30">·</span>
+                          <span className="text-[10px] text-coral">
+                            {log.distraction_count} {log.distraction_count === 1 ? "corte" : "cortes"}
+                          </span>
+                        </>
+                      )}
                       {log.label_name && (
                         <>
                           <span className="text-[10px] text-white/30">·</span>

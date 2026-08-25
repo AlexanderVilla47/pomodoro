@@ -40,6 +40,17 @@ export async function runMigrations(sql: Sql): Promise<void> {
     )
   `;
 
+  // Distracciones registradas durante la sesión de foco. Van como columnas y no
+  // como tabla aparte porque la fila de `sessions` recién existe cuando la
+  // sesión termina: los taps se acumulan en el cliente y llegan junto con el
+  // INSERT final, así que una tabla relacionada sería un segundo round-trip sin
+  // ningún beneficio. `distraction_marks` guarda segundos desde el inicio.
+  await sql`
+    ALTER TABLE sessions
+      ADD COLUMN IF NOT EXISTS distraction_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS distraction_marks INTEGER[] NOT NULL DEFAULT '{}'
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS playlists (
       id SERIAL PRIMARY KEY,

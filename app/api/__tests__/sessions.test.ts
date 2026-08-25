@@ -114,3 +114,63 @@ describe("POST /api/sessions", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("POST /api/sessions — distracciones", () => {
+  async function post(overrides = {}) {
+    const req = new Request("http://localhost/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(makeWorkSession(overrides)),
+    });
+    return POST(req);
+  }
+
+  function insertedData() {
+    return mockInsert.mock.calls[0][2];
+  }
+
+  it("persiste marks y deriva el count del array", async () => {
+    await post({ distraction_marks: [30, 600, 1200], distraction_count: 3 });
+    expect(insertedData()).toMatchObject({
+      distraction_count: 3,
+      distraction_marks: [30, 600, 1200],
+    });
+  });
+
+  it("ignora el count que manda el cliente y usa el largo real del array", async () => {
+    await post({ distraction_marks: [30, 600], distraction_count: 99 });
+    expect(insertedData().distraction_count).toBe(2);
+  });
+
+  it("default a 0 y [] cuando no se mandan distracciones", async () => {
+    await post();
+    expect(insertedData()).toMatchObject({ distraction_count: 0, distraction_marks: [] });
+  });
+
+  it("descarta marks negativos y no numéricos", async () => {
+    await post({ distraction_marks: [-5, 100, "abc", null, NaN, 200] });
+    expect(insertedData().distraction_marks).toEqual([100, 200]);
+  });
+
+  it("clampea los marks que exceden la duración real de la sesión", async () => {
+    await post({ actual_duration: 1500, distraction_marks: [1501, 99999] });
+    expect(insertedData().distraction_marks).toEqual([1500, 1500]);
+  });
+
+  it("ordena los marks de menor a mayor", async () => {
+    await post({ distraction_marks: [900, 30, 600] });
+    expect(insertedData().distraction_marks).toEqual([30, 600, 900]);
+  });
+
+  it("corta el array en el máximo permitido", async () => {
+    const marks = Array.from({ length: 500 }, (_, i) => i);
+    await post({ distraction_marks: marks });
+    expect(insertedData().distraction_marks).toHaveLength(200);
+    expect(insertedData().distraction_count).toBe(200);
+  });
+
+  it("ignora distraction_marks si no es un array", async () => {
+    await post({ distraction_marks: "3" });
+    expect(insertedData().distraction_marks).toEqual([]);
+  });
+});

@@ -11,6 +11,8 @@ interface SessionPayload {
   actual_duration: number;
   completed: boolean;
   label_id?: number | null;
+  distraction_count?: number;
+  distraction_marks?: number[];
 }
 
 const QUEUE_KEY = "pomodoro_offline_queue";
