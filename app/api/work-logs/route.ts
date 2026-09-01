@@ -5,9 +5,13 @@ import {
   getWorkLogs,
   DuplicateWorkLogError,
 } from "@/lib/db/queries/work-logs";
+import { getSessionIdByClientId } from "@/lib/db/queries/sessions";
 
 interface WorkLogBody {
-  sessionId: number;
+  /** UUID de la sesión, puesto por el cliente. La referencia buena. */
+  sessionClientId?: string;
+  /** Id numérico. Sólo lo traen los items encolados antes de este deploy. */
+  sessionId?: number;
   notes?: string | null;
   topics?: string[];
   isTheory?: boolean;
@@ -42,10 +46,39 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sessionId, notes, topics, isTheory, chunks } = body;
+  const { sessionClientId, sessionId, notes, topics, isTheory, chunks } = body;
 
-  if (typeof sessionId !== "number") {
-    return Response.json({ error: "sessionId must be a number" }, { status: 400 });
+  const db = getDb();
+  const clientRef =
+    typeof sessionClientId === "string" && sessionClientId.trim()
+      ? sessionClientId.trim()
+      : null;
+
+  let resolvedSessionId: number;
+  if (clientRef) {
+    const found = await getSessionIdByClientId(db, session.user.id, clientRef);
+    if (found === null) {
+      // ⚠️ 202, NO 400 — y esto no se "simplifica".
+      //
+      // useWorkLogger sólo da por entregado un item con 201 o 409; cualquier
+      // otro status lo reencola y lo reintenta en cada evento `online` y en
+      // cada montaje del hook. Un 400 acá sería una poison pill que no se va
+      // nunca.
+      //
+      // Y el caso es legítimo: el work log salió de la cola antes que su
+      // sesión. useOfflineSync ordena el vaciado (sesiones primero) justamente
+      // para que esto sea raro, pero "raro" no es "imposible". El 202 dice
+      // "todavía no, volvé a intentar", que es exactamente la verdad.
+      return Response.json({ pending: true }, { status: 202 });
+    }
+    resolvedSessionId = found;
+  } else if (typeof sessionId === "number") {
+    resolvedSessionId = sessionId;
+  } else {
+    return Response.json(
+      { error: "sessionClientId (or legacy sessionId) is required" },
+      { status: 400 }
+    );
   }
 
   const cleanIsTheory = isTheory === true;
@@ -66,10 +99,9 @@ export async function POST(req: Request) {
       ? notes.trim().slice(0, 2000)
       : null;
 
-  const db = getDb();
   try {
     const id = await insertWorkLog(db, session.user.id, {
-      session_id: sessionId,
+      session_id: resolvedSessionId,
       notes: cleanNotes,
       topics: cleanTopics,
       is_theory: cleanIsTheory,
