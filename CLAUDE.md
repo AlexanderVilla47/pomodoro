@@ -28,6 +28,41 @@ main ─┬─ feat/<algo>   nueva funcionalidad
 5. CI en verde
 6. **Rebase merge** (la rama se borra sola)
 
+## Entrega autónoma: el trabajo llega a producción solo
+
+Con el plan aceptado, el ciclo se completa **sin pedir confirmación**: se
+trabaja, se abre el PR, y si todo está en verde **se mergea**. El merge dispara
+el deploy en Vercel. No se deja trabajo terminado esperando un enter.
+
+Las cuatro compuertas que lo hacen seguro, todas antes del merge:
+
+| Compuerta | Qué corre |
+|---|---|
+| TDD | El test primero, se lo ve fallar |
+| `Tests` (CI, obligatorio) | `tsc --noEmit` + `vitest run` + `npm run build` |
+| `Vercel` (obligatorio) | Preview deploy con las variables reales de producción |
+| Rama al día con `main` | El PR se valida contra el main que va a recibir |
+
+Si **cualquiera** falla, no se mergea: se arregla o se reporta. Nunca se fuerza
+un merge, nunca se saltea un check.
+
+### Lo único que un revert NO deshace: las migraciones
+
+`instrumentation.ts` corre `runMigrations` al arrancar, contra la base de
+producción. Revertir el código **no revierte un `ALTER TABLE`**, y los tests
+mockean el tag `sql`, así que ninguna migración se probó nunca contra un
+Postgres real.
+
+Por eso toda migración es aditiva e idempotente (`ADD COLUMN IF NOT EXISTS`,
+`CREATE TABLE IF NOT EXISTS`): revertir el código deja una columna sin usar, que
+no rompe nada. **Un `DROP`, un `ALTER ... TYPE` o un rename NO se auto-mergean**
+— eso se consulta, porque ahí GitHub Flow ya no te salva.
+
+### Rebasar una rama: `gh pr update-branch --rebase`
+
+Nunca `git push --force` (está en la lista `deny`). Si el PR quedó atrás de
+main, se actualiza por la API de GitHub, no con un force push local.
+
 ### Reglas que no se negocian
 
 - **Nunca commitear ni pushear a `main`.** Si el trabajo ya arrancó ahí sin
