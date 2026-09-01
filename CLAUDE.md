@@ -149,19 +149,25 @@ versionados con el código. Un agente escribe el plan, otro lo toma y lo
 implementa, y el que lo termina lo marca completado.
 
 **Al arrancar una sesión: leer [`docs/planes/README.md`](docs/planes/README.md).**
-Ahí está el índice con el estado de cada uno. Si hay planes pendientes y el
-usuario pide trabajar, ese es el trabajo — no hace falta rearmar el análisis, ya
-está hecho y con el nivel de detalle para ejecutarlo.
+Ahí está el índice con el estado de cada plan. Si hay pendientes y el usuario
+pide trabajar, ese es el trabajo — no hace falta rearmar el análisis, ya está
+hecho y con el nivel de detalle para ejecutarlo.
 
-| Plan | Estado |
-|---|---|
-| [001 — Chunks de estudio](docs/planes/001-chunks-estudio.md) | ✅ Completado |
-| [002 — `client_id`](docs/planes/002-client-id.md) | ⬜ Pendiente — **arregla un bug activo** |
-| [003 — Informes de progreso](docs/planes/003-informes-progreso.md) | ⬜ Pendiente (depende del 002) |
+Con leer ese archivo alcanza. **No hace falta buscar en engram ni recorrer el
+repo** para saber qué hay pendiente: el estado del trabajo vive en el repo, no
+en la memoria. Engram guarda el *porqué* de lo ya decidido, no el *qué falta*.
 
-Al terminar un plan hay que **marcarlo completado** en el índice y en el plan, y
-corregirlo si la implementación cambió el enfoque. Un plan nuevo se guarda ahí
-con el siguiente número correlativo.
+**Acá no hay tabla de estados a propósito.** El estado vive en el índice y en el
+encabezado de cada plan, en ningún lado más. Copiarlo acá crea una tercera copia
+que se desactualiza y que un agente nuevo lee **antes** que el índice — o sea,
+lo manda a implementar algo que ya está hecho.
+`docs/planes/__tests__/indice.test.ts` lo verifica en cada PR: si el índice y el
+encabezado de un plan no coinciden, o si esta sección vuelve a enlazar planes
+sueltos, CI se pone en rojo antes del merge.
+
+Al terminar un plan hay que **marcarlo completado en los dos lugares**: el
+índice y el encabezado del plan. Si la implementación cambió el enfoque, se
+corrige el plan. Un plan nuevo va con el siguiente número correlativo.
 
 ### Contexto adicional en engram
 
