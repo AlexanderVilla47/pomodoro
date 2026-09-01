@@ -5,7 +5,7 @@ import gsap from "gsap";
 import { transition } from "@/lib/timer/stateMachine";
 import { computeRemaining, shouldLog } from "@/lib/timer/engine";
 import { useSessionLogger } from "@/hooks/useSessionLogger";
-import { notifySessionComplete } from "@/lib/notifications";
+import { notifySessionComplete, unlockChime } from "@/lib/notifications";
 import { startKeepAlive, stopKeepAlive } from "@/lib/timer/keepAlive";
 import { MAX_DISTRACTION_MARKS } from "@/lib/timer/constants";
 import type { MachineState } from "@/lib/timer/stateMachine";
@@ -325,6 +325,9 @@ export function TimerProvider({
   }, []);
 
   const start = useCallback(() => {
+    // Fuera del updater a propósito: setMachine tiene que ser puro (StrictMode
+    // lo invoca dos veces) y el desbloqueo necesita correr en el gesto mismo.
+    unlockChime();
     // sesión nueva, cortes en cero (y sin registro viejo esperando un refresh)
     resetDistractionRecord();
     setMachine((prev) => {
@@ -360,6 +363,7 @@ export function TimerProvider({
   }, [remaining]);
 
   const resume = useCallback(() => {
+    unlockChime();
     setMachine((prev) => {
       if (prev.status !== "paused") return prev;
       endTimeRef.current = Date.now() + pausedRemainingRef.current;
