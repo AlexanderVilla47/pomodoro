@@ -12,6 +12,7 @@ import { LabelSelector } from "@/components/LabelSelector";
 import type { Label } from "@/components/LabelSelector";
 import { useSettings } from "@/hooks/useSettings";
 import { useWorkLogger } from "@/hooks/useWorkLogger";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { requestNotificationPermission } from "@/lib/notifications";
 import type { Settings } from "@/lib/db/queries/settings";
 import { UserBadge } from "@/components/UserBadge";
@@ -51,10 +52,18 @@ export function HomeClient() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("timer");
   const [desktopRightTab, setDesktopRightTab] = useState<DesktopRightTab>("stats");
   const [mobileHistorialView, setMobileHistorialView] = useState<"calendar" | "day">("calendar");
-  const [pendingSessionId, setPendingSessionId] = useState<number | null>(null);
+  const [pendingClientId, setPendingClientId] = useState<string | null>(null);
   const [cheerReveal, setCheerReveal] = useState<{ names: string[]; count: number } | null>(null);
 
   const { saveWorkLog } = useWorkLogger();
+
+  // Vacía las dos colas offline en orden (sesiones antes que work logs) y
+  // refresca lo que se ve sólo si algo efectivamente se sincronizó.
+  const handleSynced = useCallback(() => {
+    setStatsVersion((v) => v + 1);
+    setHistoryVersion((v) => v + 1);
+  }, []);
+  useOfflineSync(handleSynced);
 
   useEffect(() => {
     try {
@@ -63,11 +72,13 @@ export function HomeClient() {
     } catch {}
   }, []);
 
-  const handleSessionComplete = useCallback((sessionId: number | null) => {
+  const handleSessionComplete = useCallback((sessionClientId: string | null) => {
     setStatsVersion((v) => v + 1);
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 1200);
-    if (sessionId !== null) setPendingSessionId(sessionId);
+    // Llega con el id que puso el cliente, sin esperar al servidor: por eso el
+    // prompt ahora abre igual sin internet.
+    if (sessionClientId !== null) setPendingClientId(sessionClientId);
 
     // Revela quiénes te alentaron durante la sesión (y los marca como vistos).
     fetch("/api/cheers/reveal", { method: "POST" })
@@ -83,23 +94,23 @@ export function HomeClient() {
   }, []);
 
   const handleJournalClose = useCallback(() => {
-    if (pendingSessionId !== null) {
+    if (pendingClientId !== null) {
       // Se guarda vacío para no volver a preguntar por esta sesión. is_theory
       // en false la deja explícitamente fuera del análisis de eficiencia: no
       // contestar no es lo mismo que haber hecho cero chunks.
       saveWorkLog({
-        sessionId: pendingSessionId,
+        sessionClientId: pendingClientId,
         notes: null,
         topics: [],
         isTheory: false,
         chunks: null,
       }).catch(() => {});
     }
-    setPendingSessionId(null);
-  }, [pendingSessionId, saveWorkLog]);
+    setPendingClientId(null);
+  }, [pendingClientId, saveWorkLog]);
 
   const handleJournalSaved = useCallback(() => {
-    setPendingSessionId(null);
+    setPendingClientId(null);
     setHistoryVersion((v) => v + 1);
   }, []);
 
@@ -208,11 +219,11 @@ export function HomeClient() {
               <PomodoroTimer labelColor={selectedLabel?.color} />
 
               {/* Journal overlay sobre el timer */}
-              {pendingSessionId !== null && (
+              {pendingClientId !== null && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 backdrop-blur-md rounded-2xl">
                   <div className="w-full max-w-sm mx-4">
                     <JournalPrompt
-                      sessionId={pendingSessionId}
+                      sessionClientId={pendingClientId}
                       variant="desktop"
                       onClose={handleJournalClose}
                       onSaved={handleJournalSaved}
@@ -388,7 +399,7 @@ export function HomeClient() {
 
           {/* Mobile journal prompt — fixed overlay, outside tab panels */}
           <JournalPrompt
-            sessionId={pendingSessionId}
+            sessionClientId={pendingClientId}
             variant="mobile"
             onClose={handleJournalClose}
             onSaved={handleJournalSaved}
