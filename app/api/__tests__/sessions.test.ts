@@ -174,3 +174,50 @@ describe("POST /api/sessions — distracciones", () => {
     expect(insertedData().distraction_marks).toEqual([]);
   });
 });
+
+describe("POST /api/sessions — client_id", () => {
+  async function post(overrides = {}) {
+    const req = new Request("http://localhost/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(makeWorkSession(overrides)),
+    });
+    return POST(req);
+  }
+
+  function insertedData() {
+    return mockInsert.mock.calls[0][2];
+  }
+
+  it("pasa el client_id del cliente a insertSession", async () => {
+    await post({ client_id: "9f1c2d3e-0000-4000-8000-abcdefabcdef" });
+    expect(insertedData().client_id).toBe("9f1c2d3e-0000-4000-8000-abcdefabcdef");
+  });
+
+  // Un item encolado antes de este deploy no trae client_id. Rechazarlo lo
+  // dejaría dando vueltas en la cola para siempre.
+  it("acepta un payload sin client_id y lo inserta con null", async () => {
+    const res = await post();
+    expect(res.status).toBe(201);
+    expect(insertedData().client_id).toBeNull();
+  });
+
+  // Mismo motivo que los chunks en work-logs: la cola sólo suelta un item con
+  // 201 o 204. Un 400 por un client_id mal formado sería una poison pill.
+  it.each([
+    ["number", 12345],
+    ["objeto", { a: 1 }],
+    ["array", ["x"]],
+    ["null explícito", null],
+    ["string vacío", "   "],
+  ])("normaliza a null y responde 201 con client_id %s", async (_label, client_id) => {
+    const res = await post({ client_id });
+    expect(res.status).toBe(201);
+    expect(insertedData().client_id).toBeNull();
+  });
+
+  it("recorta un client_id absurdamente largo en vez de rechazarlo", async () => {
+    await post({ client_id: "x".repeat(500) });
+    expect(insertedData().client_id).toHaveLength(64);
+  });
+});
