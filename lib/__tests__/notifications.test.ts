@@ -94,3 +94,87 @@ describe("notifySessionComplete", () => {
     expect(playMock).not.toHaveBeenCalled();
   });
 });
+
+describe("notifySessionComplete — tablets y celulares", () => {
+  function stubAudio() {
+    const playMock = vi.fn().mockResolvedValue(undefined);
+    const pauseMock = vi.fn();
+    const instances: Record<string, unknown>[] = [];
+    const AudioMock = vi.fn(() => {
+      const el = { play: playMock, pause: pauseMock, muted: false, currentTime: 0 };
+      instances.push(el);
+      return el;
+    });
+    vi.stubGlobal("Audio", AudioMock);
+    return { playMock, pauseMock, AudioMock, instances };
+  }
+
+  function stubNotificationThrowing() {
+    // Android Chrome: el constructor existe y el permiso puede ser "granted",
+    // pero invocarlo tira "Illegal constructor" — sólo se permite vía
+    // ServiceWorkerRegistration.showNotification().
+    const NotifMock = vi.fn(() => {
+      throw new TypeError("Failed to construct 'Notification': Illegal constructor.");
+    });
+    Object.defineProperty(window, "Notification", {
+      value: Object.assign(NotifMock, { permission: "granted" }),
+      configurable: true,
+      writable: true,
+    });
+    return NotifMock;
+  }
+
+  it("el sonido suena igual aunque new Notification() tire (Android)", () => {
+    const { playMock } = stubAudio();
+    stubNotificationThrowing();
+
+    notifySessionComplete("work", true);
+
+    expect(playMock).toHaveBeenCalled();
+  });
+
+  it("no propaga la excepción del constructor de Notification", () => {
+    stubAudio();
+    stubNotificationThrowing();
+
+    expect(() => notifySessionComplete("short_break", true)).not.toThrow();
+  });
+
+  it("unlockChime deja un elemento listo y notifySessionComplete lo reusa", async () => {
+    vi.resetModules();
+    const { playMock, AudioMock } = stubAudio();
+    Object.defineProperty(window, "Notification", {
+      value: Object.assign(vi.fn(), { permission: "default" }),
+      configurable: true,
+      writable: true,
+    });
+
+    const mod = await import("../notifications");
+    mod.unlockChime();
+    await Promise.resolve();
+
+    expect(AudioMock).toHaveBeenCalledTimes(1);
+    playMock.mockClear();
+
+    // El elemento desbloqueado por el gesto se reusa: crear uno nuevo desde el
+    // setTimeout lo dejaría bloqueado otra vez por la política de autoplay.
+    mod.notifySessionComplete("work", true);
+    expect(AudioMock).toHaveBeenCalledTimes(1);
+    expect(playMock).toHaveBeenCalled();
+  });
+
+  it("sin unlock previo igual intenta reproducir (desktop)", async () => {
+    vi.resetModules();
+    const { playMock } = stubAudio();
+    Object.defineProperty(window, "Notification", {
+      value: Object.assign(vi.fn(), { permission: "default" }),
+      configurable: true,
+      writable: true,
+    });
+
+    const mod = await import("../notifications");
+    mod.notifySessionComplete("work", true);
+
+    expect(playMock).toHaveBeenCalled();
+  });
+});
