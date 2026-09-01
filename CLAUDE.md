@@ -142,56 +142,36 @@ Consecuencia del modo autónomo: **al terminar hay que dejar todo asentado** —
 commits, PR abierto y un resumen de qué se hizo. Si nadie estuvo mirando
 mientras trabajabas, el PR es el único registro de lo que pasó.
 
-## Estado y próximos pasos
+## Planes: **empezá acá**
 
-Un agente nuevo arranca sin memoria de las sesiones anteriores. Este archivo se
-carga solo; el resto del contexto hay que ir a buscarlo:
+Los planes de trabajo viven en **[`docs/planes/`](docs/planes/README.md)**,
+versionados con el código. Un agente escribe el plan, otro lo toma y lo
+implementa, y el que lo termina lo marca completado.
+
+**Al arrancar una sesión: leer [`docs/planes/README.md`](docs/planes/README.md).**
+Ahí está el índice con el estado de cada uno. Si hay planes pendientes y el
+usuario pide trabajar, ese es el trabajo — no hace falta rearmar el análisis, ya
+está hecho y con el nivel de detalle para ejecutarlo.
+
+| Plan | Estado |
+|---|---|
+| [001 — Chunks de estudio](docs/planes/001-chunks-estudio.md) | ✅ Completado |
+| [002 — `client_id`](docs/planes/002-client-id.md) | ⬜ Pendiente — **arregla un bug activo** |
+| [003 — Informes de progreso](docs/planes/003-informes-progreso.md) | ⬜ Pendiente (depende del 002) |
+
+Al terminar un plan hay que **marcarlo completado** en el índice y en el plan, y
+corregirlo si la implementación cambió el enfoque. Un plan nuevo se guarda ahí
+con el siguiente número correlativo.
+
+### Contexto adicional en engram
 
 ```
-mem_search("sdd" | "convenciones" | "bugfix", project: "pomodoro")
+mem_search("convenciones" | "bugfix" | "feature", project: "pomodoro")
 ```
 
-Topic keys en engram: `convenciones/github-flow-y-modo-autonomo`,
+Topic keys: `convenciones/github-flow-y-modo-autonomo`,
 `convenciones/entrega-autonoma-produccion`,
 `feature/chunks-eficiencia-estudio`, `bugfix/audio-alertas-mobile`.
-
-### Medición de eficiencia de estudio — 3 features
-
-El problema: el usuario porciona los apuntes en "chunks" (~media página) para
-estudio activo. Notó que iba a ~1 página cada 30 minutos y le pareció lento,
-pero **no tenía con qué compararlo**. El objetivo no es un dashboard: es un
-contador de repeticiones para entrenar y ver si el ritmo mejora.
-
-**Feature 1 — Registrar chunks ✅ EN PRODUCCIÓN**
-`work_logs.is_theory` + `chunks NUMERIC(5,2)`, checkbox y stepper de 0,5 en el
-modal de cierre, `lib/analytics/efficiency.ts`.
-
-**Feature 2 — `client_id` en `sessions` (siguiente)**
-Hoy la identidad de la sesión la inventa el servidor. Dos consecuencias:
-- Sin internet el modal nunca aparece: `sendSession` falla → la sesión se
-  encola → no vuelve id → `pendingSessionId` queda null → no se pregunta nada.
-- **Bug activo de duplicados**: si el servidor inserta pero se pierde la
-  respuesta, la sesión se reencola y al recuperar conexión se inserta de nuevo.
-
-Solución: `crypto.randomUUID()` al arrancar la sesión de foco, columna
-`client_id TEXT` con índice único parcial, `ON CONFLICT (client_id) DO UPDATE
-... RETURNING id`. Hace falta además ordenar el vaciado de las dos colas
-(sesiones primero, work logs después) porque hoy compiten en el evento `online`.
-
-**Feature 3 — Informes de progreso**
-Preguntas a contestar: ¿voy más rápido? ¿me concentro más? ¿qué materia me
-cuesta más? ¿hasta dónde puedo llegar?
-
-SQL agrega crudo (`getStudyEfficiencyByDay` agrupando por día + materia,
-filtrando `is_theory = true AND chunks > 0`); **toda la matemática va en
-`lib/analytics/`** — media móvil de 7 días, promedio ponderado
-(`sum(segundos)/sum(chunks)`, nunca promediar promedios), distracciones por hora
-y piso sostenido. **Sin regresión lineal ni proyecciones** hasta tener ~14 días
-de datos: antes de eso la pendiente es ruido con cara de número serio.
-
-Ubicación: sub-vista `"analysis"` dentro de `Historial` — el tab bar de mobile
-ya tiene 4 tabs y el panel derecho de desktop 3, no entra otro sin romper los
-targets táctiles.
 
 ### Verificaciones pendientes
 
@@ -199,9 +179,6 @@ targets táctiles.
   `unlockChime()` no está probado en dispositivo real. Falta saber si la tablet
   es Android o iPad (en Android pegaban los dos bugs; en iPad fuera de modo PWA,
   probablemente sólo el de autoplay).
-- **La métrica de chunks sólo es comparable mientras el criterio de porcionado
-  no cambie.** Si los chunks se agrandan, el min/chunk sube y parece un
-  retroceso cuando en realidad se está haciendo más por chunk.
 - `public/favicon.zip` sigue sin trackear, ensuciando `git status`.
 
 ## Trampas conocidas de este repo
