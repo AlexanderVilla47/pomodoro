@@ -51,6 +51,26 @@ export async function runMigrations(sql: Sql): Promise<void> {
       ADD COLUMN IF NOT EXISTS distraction_marks INTEGER[] NOT NULL DEFAULT '{}'
   `;
 
+  // Identidad de la sesión generada por el CLIENTE (UUID), no por el servidor.
+  // Sin esto, una respuesta perdida después del INSERT hace que el cliente
+  // reencole y reinserte: dos filas para el mismo pomodoro, que inflan las horas
+  // y ensucian el min/chunk sin que se note mirando los números.
+  //
+  // El índice es PARCIAL, mismo patrón que `cheers_pending_unique`: las filas
+  // anteriores a esta migración quedan con NULL y no compiten entre sí (en un
+  // índice único común, N filas NULL sí conviven, pero el parcial además las
+  // deja fuera del índice y lo mantiene chico).
+  await sql`
+    ALTER TABLE sessions
+      ADD COLUMN IF NOT EXISTS client_id TEXT
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS sessions_client_id_unique
+      ON sessions (client_id)
+      WHERE client_id IS NOT NULL
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS playlists (
       id SERIAL PRIMARY KEY,
