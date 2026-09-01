@@ -6,10 +6,13 @@ const mockSave = vi.fn();
 const mockClose = vi.fn();
 const mockSaved = vi.fn();
 
-function setup(sessionId: number | null = 1, variant: "mobile" | "desktop" = "desktop") {
+function setup(
+  sessionClientId: string | null = "uuid-1",
+  variant: "mobile" | "desktop" = "desktop"
+) {
   return render(
     <JournalPrompt
-      sessionId={sessionId}
+      sessionClientId={sessionClientId}
       variant={variant}
       onClose={mockClose}
       onSaved={mockSaved}
@@ -24,20 +27,20 @@ beforeEach(() => {
 });
 
 describe("JournalPrompt", () => {
-  it("muestra el formulario cuando sessionId no es null", () => {
-    setup(1);
+  it("muestra el formulario cuando sessionClientId no es null", () => {
+    setup();
     expect(screen.getByText("¿En qué trabajaste?")).toBeInTheDocument();
   });
 
   it("el botón Saltar llama onClose sin guardar", () => {
-    setup(1);
+    setup();
     fireEvent.click(screen.getByText("Saltar"));
     expect(mockClose).toHaveBeenCalledOnce();
     expect(mockSave).not.toHaveBeenCalled();
   });
 
-  it("Guardar llama saveWorkLog con sessionId, notes y topics, luego onSaved", async () => {
-    setup(5);
+  it("Guardar llama saveWorkLog con sessionClientId, notes y topics, luego onSaved", async () => {
+    setup("uuid-5");
 
     fireEvent.change(screen.getByPlaceholderText(/Descripción/i), {
       target: { value: "Estudié grafos" },
@@ -47,7 +50,7 @@ describe("JournalPrompt", () => {
 
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith({
-        sessionId: 5,
+        sessionClientId: "uuid-5",
         notes: "Estudié grafos",
         topics: [],
         isTheory: false,
@@ -58,7 +61,7 @@ describe("JournalPrompt", () => {
   });
 
   it("Enter en el input de topics agrega un chip", () => {
-    setup(1);
+    setup();
     const input = screen.getByPlaceholderText("Título: ej. Unidad 1, Sesión de trabajo...");
     fireEvent.change(input, { target: { value: "grafos" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -66,7 +69,7 @@ describe("JournalPrompt", () => {
   });
 
   it("Backspace con draft vacío elimina el último chip", () => {
-    setup(1);
+    setup();
     const input = screen.getByPlaceholderText("Título: ej. Unidad 1, Sesión de trabajo...");
     fireEvent.change(input, { target: { value: "tema1" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -83,25 +86,25 @@ describe("JournalPrompt — chunks de teoría", () => {
   const minus = () => screen.getByLabelText("Restar medio chunk");
 
   it("el stepper está oculto mientras el checkbox esté destildado", () => {
-    setup(1);
+    setup();
     expect(screen.queryByLabelText("Sumar medio chunk")).not.toBeInTheDocument();
   });
 
   it("al tildar el checkbox aparece el stepper arrancando en 1", () => {
-    setup(1);
+    setup();
     fireEvent.click(theoryCheckbox());
     expect(screen.getByTestId("chunks-value")).toHaveTextContent("1");
   });
 
   it("el + suma de a medio chunk", () => {
-    setup(1);
+    setup();
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
     expect(screen.getByTestId("chunks-value")).toHaveTextContent("1,5");
   });
 
   it("el − resta de a medio chunk y no baja de 0,5", () => {
-    setup(1);
+    setup();
     fireEvent.click(theoryCheckbox());
     fireEvent.click(minus());
     expect(screen.getByTestId("chunks-value")).toHaveTextContent("0,5");
@@ -110,7 +113,7 @@ describe("JournalPrompt — chunks de teoría", () => {
   });
 
   it("guarda isTheory con la cantidad de chunks elegida", async () => {
-    setup(7);
+    setup("uuid-7");
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
     fireEvent.click(plus());
@@ -118,7 +121,7 @@ describe("JournalPrompt — chunks de teoría", () => {
 
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith({
-        sessionId: 7,
+        sessionClientId: "uuid-7",
         notes: null,
         topics: [],
         isTheory: true,
@@ -128,7 +131,7 @@ describe("JournalPrompt — chunks de teoría", () => {
   });
 
   it("destildar el checkbox descarta los chunks acumulados", async () => {
-    setup(7);
+    setup("uuid-7");
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
     fireEvent.click(theoryCheckbox());
