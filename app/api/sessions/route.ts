@@ -14,9 +14,28 @@ interface SessionBody {
   completed: boolean;
   label_id?: number | null;
   distraction_marks?: number[];
+  client_id?: string | null;
 }
 
 const VALID_TYPES = new Set(["work", "short_break", "long_break"]);
+
+/** Un UUID v4 son 36 caracteres; el tope deja aire sin permitir un TEXT enorme. */
+const MAX_CLIENT_ID = 64;
+
+/**
+ * Normaliza el client_id en vez de rechazarlo.
+ *
+ * Misma regla que los chunks en /api/work-logs: la cola offline de
+ * useSessionLogger sólo suelta un item con 201 o 204, así que un 400 por un
+ * client_id mal formado sería una poison pill que se reintenta para siempre.
+ * Un valor inválido se guarda como NULL: la sesión se inserta igual, sin la
+ * protección contra duplicados que de todas formas nunca tuvo.
+ */
+function normalizeClientId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed ? trimmed.slice(0, MAX_CLIENT_ID) : null;
+}
 
 /**
  * Los marks llegan como segundos desde el inicio de la sesión. Descartamos
@@ -46,7 +65,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { type, started_at, ended_at, planned_duration, actual_duration, completed, label_id, distraction_marks } = body;
+  const { type, started_at, ended_at, planned_duration, actual_duration, completed, label_id, distraction_marks, client_id } = body;
 
   if (!type || !VALID_TYPES.has(type)) {
     return Response.json({ error: "type must be work | short_break | long_break" }, { status: 400 });
@@ -76,6 +95,7 @@ export async function POST(req: Request) {
     label_id: label_id ?? null,
     distraction_count: marks.length,
     distraction_marks: marks,
+    client_id: normalizeClientId(client_id),
   });
 
   return Response.json({ id }, { status: 201 });
