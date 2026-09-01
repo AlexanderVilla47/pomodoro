@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import type { WorkLogPayload } from "@/hooks/useWorkLogger";
 
 interface JournalPromptProps {
-  sessionId: number | null;
+  /** UUID de la sesión. null = no hay sesión esperando respuesta. */
+  sessionClientId: string | null;
   onClose: () => void;
   onSaved: () => void;
   saveWorkLog: (p: WorkLogPayload) => Promise<void>;
@@ -27,7 +28,7 @@ function fmtNumber(n: number): string {
 }
 
 export function JournalPrompt({
-  sessionId,
+  sessionClientId,
   onClose,
   onSaved,
   saveWorkLog,
@@ -41,10 +42,10 @@ export function JournalPrompt({
   const [isTheory, setIsTheory] = useState(false);
   const [chunks, setChunks] = useState(1);
 
-  const visible = sessionId !== null;
+  const visible = sessionClientId !== null;
 
   useEffect(() => {
-    if (sessionId === null) {
+    if (sessionClientId === null) {
       setNotes("");
       setTopics([]);
       setChipDraft("");
@@ -53,7 +54,7 @@ export function JournalPrompt({
       setIsTheory(false);
       setChunks(1);
     }
-  }, [sessionId]);
+  }, [sessionClientId]);
 
   const bumpChunks = useCallback((delta: number) => {
     setChunks((prev) =>
@@ -96,7 +97,7 @@ export function JournalPrompt({
   );
 
   const handleSave = useCallback(async () => {
-    if (sessionId === null || saving) return;
+    if (sessionClientId === null || saving) return;
     const draft = chipDraft.trim();
     const finalTopics =
       draft && !topics.includes(draft) && topics.length < MAX_TOPICS
@@ -106,7 +107,7 @@ export function JournalPrompt({
     setError(null);
     try {
       await saveWorkLog({
-        sessionId,
+        sessionClientId,
         notes: notes.trim() || null,
         topics: finalTopics,
         isTheory,
@@ -117,7 +118,7 @@ export function JournalPrompt({
       setError("Error al guardar. Intentá de nuevo.");
       setSaving(false);
     }
-  }, [sessionId, saving, notes, topics, chipDraft, isTheory, chunks, saveWorkLog, onSaved]);
+  }, [sessionClientId, saving, notes, topics, chipDraft, isTheory, chunks, saveWorkLog, onSaved]);
 
   const notesOver = notes.length > MAX_NOTES;
   const topicsOver = topics.length >= MAX_TOPICS;
