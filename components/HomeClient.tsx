@@ -5,7 +5,7 @@ import { TimerProvider } from "@/context/TimerContext";
 import { YouTubePlayerProvider } from "@/context/YouTubePlayerContext";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { MusicPanel } from "@/components/MusicPanel";
-import { Dashboard } from "@/components/Dashboard";
+import { Dashboard, type DashboardView } from "@/components/Dashboard";
 import { SettingsPanel } from "@/components/Settings/SettingsPanel";
 import { Confetti } from "@/components/Confetti";
 import { LabelSelector } from "@/components/LabelSelector";
@@ -52,6 +52,11 @@ export function HomeClient() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("timer");
   const [desktopRightTab, setDesktopRightTab] = useState<DesktopRightTab>("stats");
   const [mobileHistorialView, setMobileHistorialView] = useState<"calendar" | "day">("calendar");
+  // Uno por layout: los dos Dashboard son instancias distintas y sólo una está
+  // visible a la vez, así que abrir los informes en mobile no tiene por qué
+  // estirar el panel de desktop.
+  const [desktopDashboardView, setDesktopDashboardView] = useState<DashboardView>("cards");
+  const [mobileDashboardView, setMobileDashboardView] = useState<DashboardView>("cards");
   const [pendingClientId, setPendingClientId] = useState<string | null>(null);
   const [cheerReveal, setCheerReveal] = useState<{ names: string[]; count: number } | null>(null);
 
@@ -236,7 +241,18 @@ export function HomeClient() {
 
             {/* Right panel — siempre muestra stats/historial */}
             <div className="w-[440px] shrink-0 flex flex-col gap-3 pt-3 pb-6 overflow-hidden">
-              <div className="flex flex-col gap-2 max-h-[45%] overflow-hidden shrink-0">
+              {/*
+                Con los informes abiertos el bloque se estira a todo el alto:
+                max-h-[45%] deja ~320px útiles y los informes necesitan ~480px.
+              */}
+              <div
+                data-testid="desktop-stats"
+                className={`flex flex-col gap-2 overflow-hidden ${
+                  desktopDashboardView === "analysis"
+                    ? "flex-1 min-h-0"
+                    : "max-h-[45%] shrink-0"
+                }`}
+              >
                 <div className="shrink-0 flex gap-1 p-1 bg-white/5 rounded-xl">
                   <button
                     onClick={() => setDesktopRightTab("stats")}
@@ -259,7 +275,10 @@ export function HomeClient() {
                 </div>
                 <div className="flex-1 min-h-0 overflow-hidden">
                   {desktopRightTab === "stats" ? (
-                    <Dashboard refreshTrigger={statsVersion} />
+                    <Dashboard
+                      refreshTrigger={statsVersion}
+                      onViewChange={setDesktopDashboardView}
+                    />
                   ) : desktopRightTab === "history" ? (
                     <Historial refreshTrigger={historyVersion} />
                   ) : (
@@ -267,7 +286,23 @@ export function HomeClient() {
                   )}
                 </div>
               </div>
-              <div className="flex-1 min-h-0">
+              {/*
+                `hidden` (display:none) y NO desmontar. El player de Spotify
+                vive en un ref dentro de useSpotifyPlayer y el hook no tiene
+                cleanup de unmount: desmontar deja el player huérfano — el
+                audio sigue sonando pero la app pierde el control — y al volver
+                a montar, initSDK registra un segundo dispositivo "Pomodoro".
+
+                Tampoco alcanza con opacity, que es lo que usan los tabs de
+                mobile: ahí son `absolute inset-0` apilados, pero acá el panel
+                está en flujo flex normal y seguiría ocupando su espacio.
+              */}
+              <div
+                data-testid="desktop-music"
+                className={`flex-1 min-h-0 ${
+                  desktopDashboardView === "analysis" ? "hidden" : ""
+                }`}
+              >
                 <MusicPanel />
               </div>
             </div>
@@ -317,14 +352,25 @@ export function HomeClient() {
 
             <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTab === "history" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               {mobileHistorialView === "calendar" && (
-                <Dashboard refreshTrigger={statsVersion} />
+                <div className={mobileDashboardView === "analysis" ? "flex-1 min-h-0" : ""}>
+                  <Dashboard
+                    refreshTrigger={statsVersion}
+                    onViewChange={setMobileDashboardView}
+                  />
+                </div>
               )}
-              <Historial
-                refreshTrigger={historyVersion}
-                onViewChange={setMobileHistorialView}
-                cellSize={16}
-                confirmTap
-              />
+              {/*
+                Acá el Historial sí se desmonta: no tiene estado que perder y
+                los informes necesitan todo el alto del panel.
+              */}
+              {mobileDashboardView === "cards" && (
+                <Historial
+                  refreshTrigger={historyVersion}
+                  onViewChange={setMobileHistorialView}
+                  cellSize={16}
+                  confirmTap
+                />
+              )}
             </div>
 
             <div className={`absolute inset-0 overflow-y-auto p-4 transition-opacity duration-150 ${mobileTab === "friends" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
