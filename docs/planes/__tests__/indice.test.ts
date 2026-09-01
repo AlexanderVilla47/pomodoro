@@ -16,8 +16,31 @@ import path from "node:path";
 const raizRepo = path.resolve(__dirname, "../../..");
 const dirPlanes = path.join(raizRepo, "docs", "planes");
 
-const indice = readFileSync(path.join(dirPlanes, "README.md"), "utf8");
-const claudeMd = readFileSync(path.join(raizRepo, "CLAUDE.md"), "utf8");
+/**
+ * El README documenta el formato mostrándolo, así que adentro de un bloque ```
+ * hay filas de ejemplo con la forma exacta de una fila real. Son ejemplos, no
+ * datos: leerlos como planes haría que el índice se contradiga solo.
+ */
+function sinBloquesDeCodigo(markdown: string): string {
+  let dentroDeBloque = false;
+  return markdown
+    .split("\n")
+    .map((linea) => {
+      if (/^\s*```/.test(linea)) {
+        dentroDeBloque = !dentroDeBloque;
+        return "";
+      }
+      return dentroDeBloque ? "" : linea;
+    })
+    .join("\n");
+}
+
+function leerMarkdown(...segmentos: string[]): string {
+  return sinBloquesDeCodigo(readFileSync(path.join(...segmentos), "utf8"));
+}
+
+const indice = leerMarkdown(dirPlanes, "README.md");
+const claudeMd = leerMarkdown(raizRepo, "CLAUDE.md");
 
 /** Los únicos tres estados que un plan puede declarar. */
 const MARCADORES = "⬜|🔨|✅";
@@ -47,8 +70,7 @@ function archivosDePlan(): string[] {
 }
 
 function estadoDelPlan(archivo: string): string | null {
-  const contenido = readFileSync(path.join(dirPlanes, archivo), "utf8");
-  return contenido.match(ESTADO_PLAN)?.[1] ?? null;
+  return leerMarkdown(dirPlanes, archivo).match(ESTADO_PLAN)?.[1] ?? null;
 }
 
 describe("índice de planes", () => {
