@@ -23,6 +23,22 @@ const mockInsert = vi.mocked(insertWorkLog);
 const mockGet = vi.mocked(getWorkLogs);
 const mockSession = vi.mocked(getSession);
 
+/** POST helper — el body va tal cual, para poder mandar basura a propósito. */
+function post(body: unknown) {
+  return POST(
+    new Request("http://localhost/api/work-logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+  );
+}
+
+/** El objeto que efectivamente llegó a insertWorkLog. */
+function inserted() {
+  return mockInsert.mock.calls[0][2];
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockInsert.mockResolvedValue(99);
@@ -77,6 +93,49 @@ describe("POST /api/work-logs", () => {
   });
 });
 
+describe("POST /api/work-logs — normalización de chunks", () => {
+  it("pasa is_theory y chunks cuando son válidos", async () => {
+    await post({ sessionId: 5, isTheory: true, chunks: 2.5 });
+    expect(inserted()).toMatchObject({ is_theory: true, chunks: 2.5 });
+  });
+
+  it("sin isTheory guarda false y chunks null", async () => {
+    await post({ sessionId: 5 });
+    expect(inserted()).toMatchObject({ is_theory: false, chunks: null });
+  });
+
+  it("descarta los chunks si isTheory es false", async () => {
+    await post({ sessionId: 5, isTheory: false, chunks: 3 });
+    expect(inserted()).toMatchObject({ is_theory: false, chunks: null });
+  });
+
+  it("redondea a 2 decimales", async () => {
+    await post({ sessionId: 5, isTheory: true, chunks: 2.567 });
+    expect(inserted()).toMatchObject({ chunks: 2.57 });
+  });
+
+  it("topea los chunks en 100", async () => {
+    await post({ sessionId: 5, isTheory: true, chunks: 9999 });
+    expect(inserted()).toMatchObject({ chunks: 100 });
+  });
+
+  // La cola offline de useWorkLogger solo descarta un item con 201 o 409:
+  // cualquier otro status lo reencola y lo reintenta para siempre. Un 400 por
+  // un chunk mal formado sería una poison pill. Por eso se normaliza y NUNCA
+  // se rechaza: la fila igual sirve para saber que la sesión fue de teoría.
+  it.each([
+    ["negativos", -5],
+    ["cero", 0],
+    ["string", "abc"],
+    ["null", null],
+    ["objeto", { a: 1 }],
+  ])("guarda chunks null y responde 201 con chunks %s", async (_label, chunks) => {
+    const res = await post({ sessionId: 5, isTheory: true, chunks });
+    expect(res.status).toBe(201);
+    expect(inserted()).toMatchObject({ is_theory: true, chunks: null });
+  });
+});
+
 describe("GET /api/work-logs", () => {
   it("retorna 401 sin sesión", async () => {
     mockSession.mockResolvedValueOnce(null);
@@ -91,6 +150,7 @@ describe("GET /api/work-logs", () => {
       created_at: "2026-01-01T10:00:00Z", session_type: "work",
       started_at: "2026-01-01T10:00:00Z", actual_duration: 1500,
       distraction_count: 0,
+      is_theory: false, chunks: null,
       label_id: null, label_name: null, label_color: null,
     };
     mockGet.mockResolvedValueOnce([fakeLog]);

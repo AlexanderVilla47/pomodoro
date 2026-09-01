@@ -84,7 +84,16 @@ export function HomeClient() {
 
   const handleJournalClose = useCallback(() => {
     if (pendingSessionId !== null) {
-      saveWorkLog({ sessionId: pendingSessionId, notes: null, topics: [] }).catch(() => {});
+      // Se guarda vacío para no volver a preguntar por esta sesión. is_theory
+      // en false la deja explícitamente fuera del análisis de eficiencia: no
+      // contestar no es lo mismo que haber hecho cero chunks.
+      saveWorkLog({
+        sessionId: pendingSessionId,
+        notes: null,
+        topics: [],
+        isTheory: false,
+        chunks: null,
+      }).catch(() => {});
     }
     setPendingSessionId(null);
   }, [pendingSessionId, saveWorkLog]);

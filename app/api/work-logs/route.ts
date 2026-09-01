@@ -10,6 +10,25 @@ interface WorkLogBody {
   sessionId: number;
   notes?: string | null;
   topics?: string[];
+  isTheory?: boolean;
+  chunks?: number | null;
+}
+
+const MAX_CHUNKS = 100;
+
+/**
+ * Normaliza los chunks en vez de rechazarlos.
+ *
+ * La cola offline de useWorkLogger solo da por entregado un item con 201 o 409;
+ * cualquier otro status lo reencola y lo reintenta en cada evento `online`. Un
+ * 400 por un número mal formado sería una poison pill que no se va nunca. Un
+ * chunk inválido se guarda como NULL: la fila igual sirve para saber que la
+ * sesión fue de teoría, y el análisis la filtra con `chunks > 0`.
+ */
+function normalizeChunks(value: unknown, isTheory: boolean): number | null {
+  if (!isTheory) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return Math.round(Math.min(value, MAX_CHUNKS) * 100) / 100;
 }
 
 export async function POST(req: Request) {
@@ -23,11 +42,14 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sessionId, notes, topics } = body;
+  const { sessionId, notes, topics, isTheory, chunks } = body;
 
   if (typeof sessionId !== "number") {
     return Response.json({ error: "sessionId must be a number" }, { status: 400 });
   }
+
+  const cleanIsTheory = isTheory === true;
+  const cleanChunks = normalizeChunks(chunks, cleanIsTheory);
 
   const cleanTopics = Array.isArray(topics)
     ? Array.from(
@@ -50,6 +72,8 @@ export async function POST(req: Request) {
       session_id: sessionId,
       notes: cleanNotes,
       topics: cleanTopics,
+      is_theory: cleanIsTheory,
+      chunks: cleanChunks,
     });
     return Response.json({ id }, { status: 201 });
   } catch (e) {

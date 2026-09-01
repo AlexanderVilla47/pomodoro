@@ -75,3 +75,37 @@ describe("useWorkLogger — saveWorkLog", () => {
     expect(queue).toHaveLength(0);
   });
 });
+
+describe("useWorkLogger — chunks de teoría", () => {
+  const theoryPayload = {
+    sessionId: 1,
+    notes: null,
+    topics: [],
+    isTheory: true,
+    chunks: 2.5,
+  };
+
+  it("manda isTheory y chunks en el body", async () => {
+    mockFetch.mockResolvedValueOnce({ status: 201 });
+    const { result } = renderHook(() => useWorkLogger());
+
+    await act(async () => {
+      await result.current.saveWorkLog(theoryPayload);
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body).toMatchObject({ isTheory: true, chunks: 2.5 });
+  });
+
+  it("encola el payload completo (con chunks) si no hay red", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+    const { result } = renderHook(() => useWorkLogger());
+
+    await act(async () => {
+      await result.current.saveWorkLog(theoryPayload);
+    });
+
+    const queue = JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]");
+    expect(queue[0]).toEqual(theoryPayload);
+  });
+});
