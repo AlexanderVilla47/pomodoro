@@ -9,7 +9,7 @@ marca completado. Nada se pierde entre sesiones.
 | # | Plan | Estado |
 |---|------|--------|
 | [001](001-chunks-estudio.md) | Registrar chunks de teoría por sesión | ✅ Completado |
-| [002](002-client-id.md) | `client_id`: offline real + arreglo de duplicados | ⬜ Pendiente |
+| [002](002-client-id.md) | `client_id`: offline real + arreglo de duplicados | 🔨 En progreso |
 | [003](003-informes-progreso.md) | Informes de progreso de estudio | ⬜ Pendiente (depende de 002) |
 
 ## Cómo se usa

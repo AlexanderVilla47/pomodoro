@@ -1,6 +1,6 @@
 # 002 — `client_id`: offline real + arreglo de sesiones duplicadas
 
-**Estado:** ⬜ Pendiente
+**Estado:** 🔨 En progreso
 **Bloquea a:** [003 — Informes de progreso](003-informes-progreso.md)
 
 ## Por qué
