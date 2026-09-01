@@ -1,6 +1,6 @@
 # 003 — Informes de progreso de estudio
 
-**Estado:** 🔨 En progreso
+**Estado:** ✅ Completado — 2026-09-01, PR #24
 **Depende de:** [002 — `client_id`](002-client-id.md) — ✅ ya está, desbloqueado
 
 ## Por qué esperar al 002
