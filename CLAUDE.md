@@ -1,5 +1,11 @@
 # Pomodoro — convenciones del proyecto
 
+> **Esto aplica a TODO agente que trabaje en este repo**, sesión principal y
+> subagentes por igual. Un subagente arranca con contexto vacío: quien lo
+> despliega tiene que inyectarle estas reglas en el prompt. Trabajo entregado
+> sin rama y sin PR es trabajo mal entregado, sin importar qué tan bueno sea el
+> código.
+
 ## Flujo de trabajo: GitHub Flow (obligatorio, sin excepciones)
 
 `main` es **producción**: Vercel despliega cada push a main. Por eso main está
@@ -79,6 +85,27 @@ es la excepción, no el atajo.
 - Los tests de la capa de queries mockean el tag `sql` — nunca corre SQL real.
   Por eso la lógica de cálculo va en funciones puras (`lib/analytics/`) y no en
   SQL: una fórmula escrita en SQL queda sin cobertura.
+
+## Modo autónomo
+
+Este proyecto trabaja sin pedir aprobación de permisos: `defaultMode` está en
+`bypassPermissions` (en `.claude/settings.local.json`, que no se commitea —
+`bypass` es una decisión de riesgo personal y el repo es público).
+
+La red de contención es la lista `deny` de `.claude/settings.json`, que **sí**
+se commitea porque protege a cualquiera que clone. Las reglas `deny` ganan
+siempre, incluso en modo bypass. Bloquea lo irreversible: force push, `reset
+--hard`, `clean -f`, `rm -rf`, borrado de repo o secretos, `DROP`/`TRUNCATE`,
+deploys manuales a Vercel y escritura sobre archivos `.env`.
+
+**Es un guardarraíl, no una jaula.** Las reglas matchean por prefijo de
+comando: `rm -rf x` se bloquea, pero `cd dir && rm -rf x` puede colarse. Trabajar
+en modo autónomo obliga a pensar antes de correr un comando destructivo, no
+menos.
+
+Consecuencia del modo autónomo: **al terminar hay que dejar todo asentado** —
+commits, PR abierto y un resumen de qué se hizo. Si nadie estuvo mirando
+mientras trabajabas, el PR es el único registro de lo que pasó.
 
 ## Trampas conocidas de este repo
 
