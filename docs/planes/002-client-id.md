@@ -1,6 +1,6 @@
 # 002 — `client_id`: offline real + arreglo de sesiones duplicadas
 
-**Estado:** 🔨 En progreso
+**Estado:** ✅ Completado — 2026-09-01, PR #23
 **Bloquea a:** [003 — Informes de progreso](003-informes-progreso.md)
 
 ## Por qué

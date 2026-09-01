@@ -181,6 +181,11 @@ Topic keys: `convenciones/github-flow-y-modo-autonomo`,
 
 ### Verificaciones pendientes
 
+- **El ciclo offline completo con `client_id`.** Ningún test lo cubre: los de la
+  capa de queries mockean el tag `sql`, así que el `ON CONFLICT` sobre el índice
+  parcial nunca corrió contra un Postgres real. Falta correr un pomodoro entero
+  con DevTools en Offline (el modal tiene que aparecer igual) y simular una
+  respuesta perdida después del INSERT para confirmar que no quedan dos filas.
 - **Las alarmas en la tablet.** jsdom no tiene política de autoplay: el fix de
   `unlockChime()` no está probado en dispositivo real. Falta saber si la tablet
   es Android o iPad (en Android pegaban los dos bugs; en iPad fuera de modo PWA,
