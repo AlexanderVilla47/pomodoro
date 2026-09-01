@@ -28,6 +28,33 @@ como `⬜ Pendiente` y seguir la estructura de los que ya están: por qué, la
 solución con el detalle técnico, los archivos a tocar, el orden TDD y cómo se
 verifica.
 
+## Formato: lo verifica un test, no la buena voluntad
+
+El estado vive en **dos** lugares — la tabla de acá arriba y el encabezado de
+cada plan — para que se lea de un vistazo sin abrir tres archivos. Dos copias
+divergen solas, así que
+[`__tests__/indice.test.ts`](__tests__/indice.test.ts) las mantiene atadas: si
+no coinciden, CI se pone en rojo **antes** del merge.
+
+Para que el test pueda leerlos, los dos respetan una forma fija:
+
+```markdown
+| # | Plan | Estado |                        <- fila del índice
+| [002](002-client-id.md) | Título | ⬜ Pendiente |
+
+**Estado:** ⬜ Pendiente                       <- encabezado del plan
+```
+
+- El archivo se llama `NNN-slug.md`, con `NNN` de tres dígitos.
+- El marcador es **uno de tres**: `⬜ Pendiente`, `🔨 En progreso`,
+  `✅ Completado`. El texto que va después es libre (`— PR #18`, `(depende del
+  002)`); lo que tiene que coincidir es el marcador.
+- El número de la fila tiene que ser el del archivo al que apunta.
+
+El test también cuida la puerta de entrada: **`CLAUDE.md` no puede enlazar
+planes sueltos ni repetir un estado.** Se carga sola en cada sesión, así que una
+copia desactualizada ahí es la que un agente nuevo lee primero.
+
 ## Reglas
 
 - **Un plan pendiente no se implementa a medias.** Si hay que cortar, se anota
