@@ -50,6 +50,8 @@ describe("JournalPrompt", () => {
         sessionId: 5,
         notes: "Estudié grafos",
         topics: [],
+        isTheory: false,
+        chunks: null,
       });
       expect(mockSaved).toHaveBeenCalledOnce();
     });
@@ -74,3 +76,69 @@ describe("JournalPrompt", () => {
     expect(screen.queryByText("tema1")).not.toBeInTheDocument();
   });
 });
+
+describe("JournalPrompt — chunks de teoría", () => {
+  const theoryCheckbox = () => screen.getByLabelText(/Estudié teoría por chunks/i);
+  const plus = () => screen.getByLabelText("Sumar medio chunk");
+  const minus = () => screen.getByLabelText("Restar medio chunk");
+
+  it("el stepper está oculto mientras el checkbox esté destildado", () => {
+    setup(1);
+    expect(screen.queryByLabelText("Sumar medio chunk")).not.toBeInTheDocument();
+  });
+
+  it("al tildar el checkbox aparece el stepper arrancando en 1", () => {
+    setup(1);
+    fireEvent.click(theoryCheckbox());
+    expect(screen.getByTestId("chunks-value")).toHaveTextContent("1");
+  });
+
+  it("el + suma de a medio chunk", () => {
+    setup(1);
+    fireEvent.click(theoryCheckbox());
+    fireEvent.click(plus());
+    expect(screen.getByTestId("chunks-value")).toHaveTextContent("1,5");
+  });
+
+  it("el − resta de a medio chunk y no baja de 0,5", () => {
+    setup(1);
+    fireEvent.click(theoryCheckbox());
+    fireEvent.click(minus());
+    expect(screen.getByTestId("chunks-value")).toHaveTextContent("0,5");
+    fireEvent.click(minus());
+    expect(screen.getByTestId("chunks-value")).toHaveTextContent("0,5");
+  });
+
+  it("guarda isTheory con la cantidad de chunks elegida", async () => {
+    setup(7);
+    fireEvent.click(theoryCheckbox());
+    fireEvent.click(plus());
+    fireEvent.click(plus());
+    fireEvent.click(screen.getByText("Guardar"));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith({
+        sessionId: 7,
+        notes: null,
+        topics: [],
+        isTheory: true,
+        chunks: 2,
+      });
+    });
+  });
+
+  it("destildar el checkbox descarta los chunks acumulados", async () => {
+    setup(7);
+    fireEvent.click(theoryCheckbox());
+    fireEvent.click(plus());
+    fireEvent.click(theoryCheckbox());
+    fireEvent.click(screen.getByText("Guardar"));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(
+        expect.objectContaining({ isTheory: false, chunks: null })
+      );
+    });
+  });
+});
+

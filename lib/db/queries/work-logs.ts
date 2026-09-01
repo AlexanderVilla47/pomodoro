@@ -6,6 +6,8 @@ export interface NewWorkLog {
   session_id: number;
   notes?: string | null;
   topics: string[];
+  is_theory?: boolean;
+  chunks?: number | null;
 }
 
 export interface WorkLogRow {
@@ -18,9 +20,21 @@ export interface WorkLogRow {
   started_at: string;
   actual_duration: number;
   distraction_count: number;
+  is_theory: boolean;
+  chunks: number | null;
   label_id: number | null;
   label_name: string | null;
   label_color: string | null;
+}
+
+/**
+ * postgres.js mapea NUMERIC a string para no perder precisión — sumar sin
+ * convertir concatena en vez de sumar, y falla en silencio.
+ */
+function toNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 export class DuplicateWorkLogError extends Error {
@@ -37,12 +51,14 @@ export async function insertWorkLog(
 ): Promise<number> {
   try {
     const [row] = await sql<[{ id: number }]>`
-      INSERT INTO work_logs (session_id, user_id, notes, topics)
+      INSERT INTO work_logs (session_id, user_id, notes, topics, is_theory, chunks)
       VALUES (
         ${data.session_id},
         ${userId},
         ${data.notes ?? null},
-        ${data.topics}
+        ${data.topics},
+        ${data.is_theory ?? false},
+        ${data.chunks ?? null}
       )
       RETURNING id
     `;
@@ -67,13 +83,15 @@ export async function getWorkLogs(
 ): Promise<WorkLogRow[]> {
   const limit = Math.min(Math.max(opts.limit, 1), 50);
   const tzMins = opts.tz ?? 0;
-  return sql<WorkLogRow[]>`
+  const rows = await sql<WorkLogRow[]>`
     SELECT
       w.id,
       w.session_id,
       w.notes,
       w.topics,
       w.created_at::text AS created_at,
+      w.is_theory,
+      w.chunks,
       s.type             AS session_type,
       s.started_at::text AS started_at,
       s.actual_duration,
@@ -93,4 +111,5 @@ export async function getWorkLogs(
     ORDER BY w.created_at DESC
     LIMIT ${limit}
   `;
+  return rows.map((r) => ({ ...r, chunks: toNumberOrNull(r.chunks) }));
 }

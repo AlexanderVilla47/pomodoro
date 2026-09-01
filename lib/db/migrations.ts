@@ -102,6 +102,23 @@ export async function runMigrations(sql: Sql): Promise<void> {
       ON work_logs (user_id, created_at DESC)
   `;
 
+  // Estudio por "chunks" (porciones de apunte, ~media página) para medir
+  // minutos por chunk y ver si el ritmo mejora con el tiempo.
+  //
+  // `is_theory` es el filtro explícito del análisis y no un lujo: al saltear el
+  // prompt igual se inserta una fila (para no volver a preguntar), así que
+  // `chunks` queda NULL. Ese NULL significa "no contesté", NO "hice 0 chunks";
+  // contarlo como cero rompería el promedio. El booleano separa las dos cosas
+  // sin que nadie tenga que adivinar la intención de un campo vacío.
+  //
+  // NUMERIC porque se cierra el pomodoro con medio chunk hecho más seguido de
+  // lo que uno quisiera. Ojo: postgres.js lo devuelve como STRING.
+  await sql`
+    ALTER TABLE work_logs
+      ADD COLUMN IF NOT EXISTS is_theory BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS chunks    NUMERIC(5,2)
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS friendships (
       id           SERIAL PRIMARY KEY,

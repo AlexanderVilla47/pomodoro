@@ -6,6 +6,8 @@ export interface WorkLogPayload {
   sessionId: number;
   notes: string | null;
   topics: string[];
+  isTheory?: boolean;
+  chunks?: number | null;
 }
 
 const QUEUE_KEY = "pomodoro_worklog_queue";
@@ -58,16 +60,13 @@ export function useWorkLogger() {
   const saveWorkLog = useCallback(async (p: WorkLogPayload): Promise<void> => {
     try {
       const ok = await sendWorkLog(p);
-      if (!ok) {
-        const queue = getQueue();
-        queue.push(p);
-        saveQueue(queue);
-      }
+      if (ok) return;
     } catch {
-      const queue = getQueue();
-      queue.push(p);
-      saveQueue(queue);
+      // cae al encolado de abajo
     }
+    const queue = getQueue();
+    queue.push(p);
+    saveQueue(queue);
   }, []);
 
   return { saveWorkLog };
