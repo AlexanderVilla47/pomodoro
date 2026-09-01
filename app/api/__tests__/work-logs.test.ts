@@ -14,14 +14,19 @@ vi.mock("@/lib/db/queries/work-logs", () => ({
     constructor() { super("dup"); this.name = "DuplicateWorkLogError"; }
   },
 }));
+vi.mock("@/lib/db/queries/sessions", () => ({
+  getSessionIdByClientId: vi.fn(),
+}));
 
 import { POST, GET } from "../work-logs/route";
 import { insertWorkLog, getWorkLogs, DuplicateWorkLogError } from "@/lib/db/queries/work-logs";
+import { getSessionIdByClientId } from "@/lib/db/queries/sessions";
 import { getSession } from "@/lib/auth/session";
 
 const mockInsert = vi.mocked(insertWorkLog);
 const mockGet = vi.mocked(getWorkLogs);
 const mockSession = vi.mocked(getSession);
+const mockResolve = vi.mocked(getSessionIdByClientId);
 
 /** POST helper — el body va tal cual, para poder mandar basura a propósito. */
 function post(body: unknown) {
@@ -43,6 +48,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockInsert.mockResolvedValue(99);
   mockGet.mockResolvedValue([]);
+  mockResolve.mockResolvedValue(5);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockSession.mockResolvedValue({ user: { id: "test-user" }, session: { id: "sess-1" } } as any);
 });
@@ -133,6 +139,59 @@ describe("POST /api/work-logs — normalización de chunks", () => {
     const res = await post({ sessionId: 5, isTheory: true, chunks });
     expect(res.status).toBe(201);
     expect(inserted()).toMatchObject({ is_theory: true, chunks: null });
+  });
+});
+
+describe("POST /api/work-logs — resolución por sessionClientId", () => {
+  it("resuelve el client_id a la sesión real y la usa para insertar", async () => {
+    mockResolve.mockResolvedValueOnce(77);
+    const res = await post({ sessionClientId: "uuid-1" });
+    expect(res.status).toBe(201);
+    expect(mockResolve).toHaveBeenCalledWith(expect.anything(), "test-user", "uuid-1");
+    expect(inserted()).toMatchObject({ session_id: 77 });
+  });
+
+  // ⚠️ 202, NO 400. useWorkLogger sólo da por entregado un item con 201 o 409;
+  // cualquier otro status lo reencola. Un 400 acá sería una poison pill que se
+  // reintenta en cada evento `online` y en cada montaje del hook, para siempre.
+  // El 202 dice "todavía no, volvé a intentar", que es exactamente la verdad:
+  // la sesión está en la otra cola y aún no llegó al servidor.
+  it("responde 202 cuando la sesión todavía no llegó al servidor", async () => {
+    mockResolve.mockResolvedValueOnce(null);
+    const res = await post({ sessionClientId: "uuid-todavia-no" });
+    expect(res.status).toBe(202);
+  });
+
+  it("no responde 400 cuando la sesión todavía no llegó", async () => {
+    mockResolve.mockResolvedValueOnce(null);
+    const res = await post({ sessionClientId: "uuid-todavia-no" });
+    expect(res.status).not.toBe(400);
+  });
+
+  it("no inserta nada si la sesión no se pudo resolver", async () => {
+    mockResolve.mockResolvedValueOnce(null);
+    await post({ sessionClientId: "uuid-todavia-no" });
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  // Un work log encolado antes de este deploy trae el id numérico. Rechazarlo
+  // lo dejaría reintentándose para siempre por el mismo motivo de arriba.
+  it("sigue aceptando el sessionId numérico de la cola vieja", async () => {
+    const res = await post({ sessionId: 5, notes: "algo" });
+    expect(res.status).toBe(201);
+    expect(mockResolve).not.toHaveBeenCalled();
+    expect(inserted()).toMatchObject({ session_id: 5 });
+  });
+
+  it("prefiere el sessionClientId si vienen los dos", async () => {
+    mockResolve.mockResolvedValueOnce(77);
+    await post({ sessionClientId: "uuid-1", sessionId: 5 });
+    expect(inserted()).toMatchObject({ session_id: 77 });
+  });
+
+  it("retorna 400 si no viene ninguna de las dos referencias", async () => {
+    const res = await post({ notes: "algo" });
+    expect(res.status).toBe(400);
   });
 });
 
