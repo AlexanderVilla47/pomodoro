@@ -29,3 +29,21 @@ jobs:
 
       - name: Correr tests
         run: npx vitest run
+
+      # El merge a main dispara el deploy en Vercel, así que la build tiene que
+      # fallar ACÁ y bloquear el PR. Si sólo fallara en Vercel, el PR entraría
+      # igual y producción se quedaría en el deploy anterior sin que nadie se
+      # entere: mergeado y sin desplegar, que es el peor de los dos mundos.
+      #
+      # Los valores de abajo son placeholders obviamente falsos, no secretos.
+      # La build nunca se conecta: las páginas que tocan sesión son dinámicas y
+      # no se prerenderizan. Sólo existen para que los módulos que leen env al
+      # importarse encuentren algo con forma válida.
+      - name: Build de producción
+        run: npm run build
+        env:
+          POSTGRES_URL: postgres://build:placeholder@localhost:5432/placeholder
+          BETTER_AUTH_SECRET: placeholder-no-es-un-secreto-real
+          BETTER_AUTH_URL: http://localhost:4000
+          GOOGLE_CLIENT_ID: placeholder-no-es-un-secreto-real
+          GOOGLE_CLIENT_SECRET: placeholder-no-es-un-secreto-real
