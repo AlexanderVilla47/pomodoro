@@ -1,7 +1,7 @@
 # 003 — Informes de progreso de estudio
 
 **Estado:** ⬜ Pendiente
-**Depende de:** [002 — `client_id`](002-client-id.md) — no arrancar antes
+**Depende de:** [002 — `client_id`](002-client-id.md) — ✅ ya está, desbloqueado
 
 ## Por qué esperar al 002
 
