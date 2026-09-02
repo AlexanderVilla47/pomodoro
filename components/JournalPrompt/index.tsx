@@ -263,49 +263,6 @@ function JournalContent({
 
       {/* Contenido scrollable */}
       <div className="overflow-y-auto no-scrollbar px-3 flex flex-col gap-2.5">
-        {/* Teoría por chunks — arriba de todo porque es el dato que se mide */}
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={isTheory}
-              onChange={() => setIsTheory((v) => !v)}
-              className="w-4 h-4 rounded accent-[var(--color-mint)] cursor-pointer"
-            />
-            <span className="text-xs text-white/70">Estudié teoría por chunks</span>
-          </label>
-
-          {isTheory && (
-            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-              <StepperButton
-                label="Restar medio chunk"
-                onClick={() => bumpChunks(-CHUNK_STEP)}
-                disabled={chunks <= CHUNK_MIN}
-              >
-                −
-              </StepperButton>
-              <div className="flex-1 text-center">
-                <span
-                  data-testid="chunks-value"
-                  className="text-lg font-semibold text-white tabular-nums"
-                >
-                  {fmtNumber(chunks)}
-                </span>
-                <span className="text-[10px] text-white/35 ml-1.5">
-                  {chunks === 1 ? "chunk" : "chunks"}
-                </span>
-              </div>
-              <StepperButton
-                label="Sumar medio chunk"
-                onClick={() => bumpChunks(CHUNK_STEP)}
-                disabled={chunks >= CHUNK_MAX}
-              >
-                +
-              </StepperButton>
-            </div>
-          )}
-        </div>
-
         {/* Topics */}
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap gap-1.5 bg-white/5 border border-white/10 rounded-xl p-2 min-h-[36px]">
@@ -350,6 +307,54 @@ function JournalContent({
           <div className={`text-right text-[10px] ${notesOver ? "text-red-400" : "text-white/25"}`}>
             {notes.length}/{MAX_NOTES}
           </div>
+        </div>
+
+        {/*
+          Teoría por bloques — debajo de las cajas de texto. Primero se escribe
+          qué se hizo, después se declara cómo se mide: arriba, el primer campo
+          del modal era una casilla que la mayoría de las sesiones deja sin
+          tildar.
+        */}
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isTheory}
+              onChange={() => setIsTheory((v) => !v)}
+              className="w-4 h-4 rounded accent-[var(--color-mint)] cursor-pointer"
+            />
+            <span className="text-xs text-white/70">Estudié teoría por bloques</span>
+          </label>
+
+          {isTheory && (
+            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              <StepperButton
+                label="Restar medio bloque"
+                onClick={() => bumpChunks(-CHUNK_STEP)}
+                disabled={chunks <= CHUNK_MIN}
+              >
+                −
+              </StepperButton>
+              <div className="flex-1 text-center">
+                <span
+                  data-testid="bloques-value"
+                  className="text-lg font-semibold text-white tabular-nums"
+                >
+                  {fmtNumber(chunks)}
+                </span>
+                <span className="text-[10px] text-white/35 ml-1.5">
+                  {chunks === 1 ? "bloque" : "bloques"}
+                </span>
+              </div>
+              <StepperButton
+                label="Sumar medio bloque"
+                onClick={() => bumpChunks(CHUNK_STEP)}
+                disabled={chunks >= CHUNK_MAX}
+              >
+                +
+              </StepperButton>
+            </div>
+          )}
         </div>
 
         {error && <p className="text-xs text-red-400">{error}</p>}
