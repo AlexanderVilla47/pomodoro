@@ -5,6 +5,7 @@ import {
   groupByPeriod,
   compare,
   byLabel,
+  MIN_SECONDS_FOR_RATE,
   type EfficiencyRow,
   type Granularity,
   type Direction,
@@ -280,6 +281,32 @@ export function StudyReports({ onBack }: StudyReportsProps) {
                     </div>
                   );
                 })}
+
+                {/*
+                  No inventar una comparación contra la nada está bien, pero
+                  quedarse mudo es el mismo pecado que el empty state: el
+                  usuario se queda mirando sin saber si se rompió.
+                */}
+                {!previous && (
+                  <p
+                    data-testid="no-previous-period"
+                    className="text-[10px] text-white/25 leading-relaxed pt-0.5"
+                  >
+                    Todavía no hay{" "}
+                    {granularity === "week" ? "una semana anterior" : "un mes anterior"} para
+                    comparar.
+                  </p>
+                )}
+
+                {current.distractionsPerHour === null && current.studyDays > 0 && (
+                  <p
+                    data-testid="rate-floor-hint"
+                    className="text-[10px] text-white/25 leading-relaxed pt-0.5"
+                  >
+                    Los cortes por hora necesitan al menos {MIN_SECONDS_FOR_RATE / 60} min de
+                    estudio en el período: con menos, el número se estira y exagera.
+                  </p>
+                )}
               </div>
             )}
 
