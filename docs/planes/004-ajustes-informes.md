@@ -1,6 +1,6 @@
 # 004 — Ajustes a los informes: el silencio y los números absurdos
 
-**Estado:** 🔨 En progreso
+**Estado:** ✅ Completado — 2026-09-02, PR #27
 **Depende de:** [003 — Informes de progreso](003-informes-progreso.md) — ✅ ya está
 
 ## De dónde salen estos dos
