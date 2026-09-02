@@ -183,6 +183,38 @@ describe("distractionsPerHour", () => {
       distractionsPerHour([row({ day: "2026-08-17", total_seconds: 0, distractions: 2 })])
     ).toBeNull();
   });
+
+  it("no extrapola una muestra diminuta: 2 cortes en 1 minuto NO son 120/hora", () => {
+    // El caso real que motivo el piso. La cuenta 2 / (60/3600) = 120 es
+    // correcta, pero llevar un minuto a una hora multiplica por 60 y
+    // convierte el ruido en titular.
+    const rows = [row({ day: "2026-08-17", total_seconds: 60, total_chunks: 1, distractions: 2 })];
+    expect(distractionsPerHour(rows)).toBeNull();
+  });
+
+  it("justo en el piso de 15 minutos ya devuelve el numero", () => {
+    // 900s = 15 min, 1 corte -> 4 cortes/hora
+    const rows = [row({ day: "2026-08-17", total_seconds: 900, total_chunks: 2, distractions: 1 })];
+    expect(distractionsPerHour(rows)).toBe(4);
+  });
+
+  it("un pomodoro completo de 25 minutos pasa el piso", () => {
+    // El default de work_duration es 1500s. Un piso que escondiera una sesion
+    // entera taparia el caso mas comun de todos.
+    const rows = [row({ day: "2026-08-17", total_seconds: 1500, total_chunks: 2, distractions: 1 })];
+    expect(distractionsPerHour(rows)).toBe(2.4);
+  });
+
+  it("suma a lo largo del periodo antes de aplicar el piso", () => {
+    // Tres sesiones cortas que solas no llegarian, pero juntas si: el piso es
+    // del periodo, no de cada sesion.
+    const rows = [
+      row({ day: "2026-08-17", total_seconds: 360, total_chunks: 1, distractions: 1 }),
+      row({ day: "2026-08-18", total_seconds: 360, total_chunks: 1, distractions: 1 }),
+      row({ day: "2026-08-19", total_seconds: 360, total_chunks: 1, distractions: 1 }),
+    ];
+    expect(distractionsPerHour(rows)).toBe(10);
+  });
 });
 
 describe("summarize", () => {
