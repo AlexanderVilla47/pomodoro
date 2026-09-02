@@ -3,6 +3,26 @@
 **Estado:** ✅ Completado — 2026-09-02, PR #27
 **Depende de:** [003 — Informes de progreso](003-informes-progreso.md) — ✅ ya está
 
+> ## ⚠️ Corrección posterior — 2026-09-02, PR #28
+>
+> **Las leyendas explicativas se sacaron de la UI por decisión del usuario**, que
+> las vio en pantalla y las consideró un muro de texto: tres párrafos grises
+> apilados en un panel chico.
+>
+> Qué quedó de cada cosa:
+>
+> - **Fix 1 (el aviso de "no hay período anterior") — revertido.** Cuando hay un
+>   solo período no se muestra nada, como antes de este plan.
+> - **Fix 2 — la lógica SIGUE VIVA.** El piso de 15 minutos en
+>   `distractionsPerHour` no se tocó: cortes/hora sigue mostrando `—` en vez de
+>   un 120 extrapolado. Lo único que se sacó fue el texto que lo explicaba.
+> - El caveat de porcionado que venía del [003](003-informes-progreso.md)
+>   también se sacó del panel.
+>
+> El razonamiento de por qué cada aviso existía queda escrito acá abajo: si
+> alguna vez el silencio vuelve a confundir, el análisis ya está hecho y sólo
+> hay que decidir un formato menos pesado que un párrafo.
+
 ## De dónde salen estos dos
 
 De usar el 003 con datos reales por primera vez. Los dos son el mismo tipo de
