@@ -125,13 +125,33 @@ export function blocksPerStudyDay(rows: EfficiencyRow[]): number | null {
 }
 
 /**
+ * Piso de muestra para `distractionsPerHour`, en segundos.
+ *
+ * La métrica extrapola a una hora, y ese factor es `3600 / segundos`: con un
+ * minuto de estudio multiplica por 60 y convierte el ruido en titular — 2
+ * cortes en 1 minuto se leen como "120 cortes/hora".
+ *
+ * 15 minutos deja el factor en ×4 y, sobre todo, deja pasar cómodo un pomodoro
+ * entero: `work_duration` arranca en 1500s (25 min), así que cualquier piso más
+ * alto escondería el caso más común de todos.
+ */
+const MIN_SECONDS_FOR_RATE = 15 * 60;
+
+/**
  * Distracciones por hora estudiada. Normalizar por tiempo es lo que la vuelve
  * comparable: estudiar más horas produce más cortes en términos absolutos sin
  * que eso signifique estar peor concentrado.
+ *
+ * Devuelve null bajo el piso de muestra. El piso vive acá y no en la UI porque
+ * es una regla de la métrica, no de cómo se dibuja: si el número se usa en otro
+ * lado, la regla viaja con él.
+ *
+ * Es del período completo, no de cada sesión: tres sesiones de 6 minutos suman
+ * 18 y sí se muestran.
  */
 export function distractionsPerHour(rows: EfficiencyRow[]): number | null {
   const { seconds, distractions } = totals(rows);
-  if (seconds <= 0) return null;
+  if (seconds < MIN_SECONDS_FOR_RATE) return null;
   return round1(distractions / (seconds / 3600));
 }
 
