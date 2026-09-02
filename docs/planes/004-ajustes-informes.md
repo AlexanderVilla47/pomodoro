@@ -1,6 +1,6 @@
 # 004 — Ajustes a los informes: el silencio y los números absurdos
 
-**Estado:** ⬜ Pendiente
+**Estado:** 🔨 En progreso
 **Depende de:** [003 — Informes de progreso](003-informes-progreso.md) — ✅ ya está
 
 ## De dónde salen estos dos
@@ -68,9 +68,9 @@ que más chico puede ponerse.
 
 ### La solución
 
-Un piso de muestra: **si el período tiene menos de 30 minutos de estudio,
+Un piso de muestra: **si el período tiene menos de 15 minutos de estudio,
 `distractionsPerHour` devuelve `null`** y la UI muestra `—` con su explicación
-al tocarlo o al lado.
+al lado.
 
 Encaja con la convención que ya existe en `lib/analytics/efficiency.ts`: `null`
 significa "este dato todavía no existe", y ya se usa para chunks en cero. Un
@@ -80,11 +80,29 @@ significa "este dato todavía no existe", y ya se usa para chunks en cero. Un
 de cómo se dibuja: si mañana el número se usa en otro lado, la regla viaja con
 él y queda cubierta por tests.
 
-### Decisión pendiente
+### De dónde salen los 15 minutos
 
-30 minutos es un número elegido a ojo. Al implementarlo, vale mirar cuánto dura
-una sesión típica y ajustarlo — pero que sea **una constante nombrada** y no un
-número suelto en medio de la función.
+El plan arrancó proponiendo 30, elegidos a ojo, y anotó que había que mirar
+cuánto dura una sesión típica. Se miró: `migrations.ts` pone
+`work_duration INTEGER NOT NULL DEFAULT 1500`, o sea **el pomodoro por defecto
+es de 25 minutos**.
+
+Un piso de 30 habría escondido cortes/hora para **una sesión completa**, que es
+el caso más común de todos. Mal piso.
+
+Lo que se está acotando es el factor de extrapolación, `3600 / segundos`:
+
+| Estudio en el período | Multiplicador |
+|---|---|
+| 1 min | ×60 — absurdo |
+| 5 min | ×12 |
+| **15 min** | **×4 — el corte** |
+| 25 min (un pomodoro) | ×2,4 |
+| 1 hora | ×1 |
+
+A 15 minutos el número sigue siendo una extrapolación, pero deja pasar cómodo un
+pomodoro entero y corta los ×60 que convierten el ruido en titular. Va como
+**constante nombrada**, no como número suelto en medio de la función.
 
 ### Archivos
 
