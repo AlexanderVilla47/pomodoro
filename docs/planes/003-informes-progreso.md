@@ -211,5 +211,9 @@ explícitamente, no mostrar un gráfico vacío que parece un bug.
 
 La métrica sólo es comparable **mientras el criterio de porcionado no cambie**.
 El día que los bloques se agranden, el min/bloque sube y va a parecer un
-retroceso cuando en realidad se está haciendo más por bloque. Vale la pena que
-la UI lo diga en algún lado.
+retroceso cuando en realidad se está haciendo más por bloque.
+
+> **Corrección — 2026-09-02, PR #28.** Este caveat llegó a estar escrito en el
+> panel y **se sacó por decisión del usuario**: el aviso ocupaba lugar fijo para
+> algo que se lee una vez. La trampa sigue siendo real, pero vive acá y no en la
+> pantalla.

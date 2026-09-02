@@ -101,44 +101,27 @@ describe("StudyReports", () => {
     expect(screen.queryByTestId("trend-minutes-per-block")).toBeNull();
   });
 
-  it("sin periodo anterior explica por que no hay comparacion", async () => {
-    // No inventar una comparacion contra la nada esta bien, pero quedarse
-    // MUDO es el mismo pecado que el empty state: el usuario se queda
-    // mirando la pantalla sin saber si se rompio o si falta cargar datos.
-    stubRows([DOS_SEMANAS[1]]);
-    render(<StudyReports onBack={vi.fn()} />);
-    await waitFor(() => screen.getByTestId("no-previous-period"));
-    expect(screen.getByTestId("no-previous-period").textContent).toMatch(/semana anterior/i);
-  });
-
-  it("el aviso sigue la granularidad activa", async () => {
-    stubRows([DOS_SEMANAS[1]]);
-    render(<StudyReports onBack={vi.fn()} />);
-    await waitFor(() => screen.getByTestId("no-previous-period"));
-
-    await userEvent.click(screen.getByRole("button", { name: /mes/i }));
-
-    await waitFor(() =>
-      expect(screen.getByTestId("no-previous-period").textContent).toMatch(/mes anterior/i)
-    );
-  });
-
-  it("con dos periodos el aviso desaparece y aparecen las flechas", async () => {
-    stubRows(DOS_SEMANAS);
-    render(<StudyReports onBack={vi.fn()} />);
-    await waitFor(() => screen.getByTestId("trend-minutes-per-block"));
-    expect(screen.queryByTestId("no-previous-period")).toBeNull();
-  });
-
-  it("cortes/hora bajo el piso de muestra muestra un guion y lo explica", async () => {
-    // Una sesion de 1 minuto con 2 cortes daria 120 cortes/hora.
+  it("cortes/hora bajo el piso de muestra queda en guion, sin mostrar el 120", async () => {
+    // El piso sigue vivo en la logica: lo que se saco es el texto que lo
+    // explicaba, no la proteccion. Una sesion de 1 minuto con 2 cortes daria
+    // 120 cortes/hora.
     stubRows([
       row({ day: "2026-08-24", total_seconds: 60, total_chunks: 1, sessions: 1, distractions: 2 }),
     ]);
     render(<StudyReports onBack={vi.fn()} />);
     await waitFor(() => expect(valueOf("metric-distractions-per-hour")).toContain("—"));
     expect(document.body.textContent).not.toMatch(/120/);
-    expect(screen.getByTestId("rate-floor-hint").textContent).toMatch(/15 min/i);
+  });
+
+  it("no cuelga leyendas explicativas en el panel", async () => {
+    // Decision del usuario: tres parrafos grises apilados son un muro de
+    // texto. Los numeros se explican solos o no se explican.
+    stubRows([DOS_SEMANAS[1]]);
+    render(<StudyReports onBack={vi.fn()} />);
+    await waitFor(() => screen.getByTestId("metric-minutes-per-block"));
+    expect(screen.queryByTestId("no-previous-period")).toBeNull();
+    expect(screen.queryByTestId("rate-floor-hint")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/porcion/i);
   });
 
   it("cambia de semana a mes y recalcula", async () => {
