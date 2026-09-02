@@ -80,39 +80,60 @@ describe("JournalPrompt", () => {
   });
 });
 
-describe("JournalPrompt — chunks de teoría", () => {
-  const theoryCheckbox = () => screen.getByLabelText(/Estudié teoría por chunks/i);
-  const plus = () => screen.getByLabelText("Sumar medio chunk");
-  const minus = () => screen.getByLabelText("Restar medio chunk");
+describe("JournalPrompt — bloques de teoría", () => {
+  const theoryCheckbox = () => screen.getByLabelText(/Estudié teoría por bloques/i);
+  const plus = () => screen.getByLabelText("Sumar medio bloque");
+  const minus = () => screen.getByLabelText("Restar medio bloque");
+
+  it("no dice chunk en ningún lado", () => {
+    // La unidad se llama bloque en toda la UI. El rename del plan 003 se hizo
+    // en los informes y se olvidó de este modal, que es justo donde el dato
+    // se carga.
+    setup();
+    fireEvent.click(screen.getByLabelText(/Estudié teoría por bloques/i));
+    expect(document.body.textContent).not.toMatch(/chunk/i);
+    expect(document.body.innerHTML).not.toMatch(/chunk/i);
+  });
+
+  it("el checkbox va DEBAJO de las cajas de texto", () => {
+    // Primero se escribe qué se hizo, después se declara cómo se mide. Al
+    // revés, el primer campo del modal es una casilla que la mayoría de las
+    // sesiones deja sin tildar.
+    setup();
+    const textarea = screen.getByPlaceholderText(/Descripción/i);
+    const checkbox = screen.getByLabelText(/Estudié teoría por bloques/i);
+    const posicion = textarea.compareDocumentPosition(checkbox);
+    expect(posicion & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 
   it("el stepper está oculto mientras el checkbox esté destildado", () => {
     setup();
-    expect(screen.queryByLabelText("Sumar medio chunk")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Sumar medio bloque")).not.toBeInTheDocument();
   });
 
   it("al tildar el checkbox aparece el stepper arrancando en 1", () => {
     setup();
     fireEvent.click(theoryCheckbox());
-    expect(screen.getByTestId("chunks-value")).toHaveTextContent("1");
+    expect(screen.getByTestId("bloques-value")).toHaveTextContent("1");
   });
 
-  it("el + suma de a medio chunk", () => {
+  it("el + suma de a medio bloque", () => {
     setup();
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
-    expect(screen.getByTestId("chunks-value")).toHaveTextContent("1,5");
+    expect(screen.getByTestId("bloques-value")).toHaveTextContent("1,5");
   });
 
-  it("el − resta de a medio chunk y no baja de 0,5", () => {
+  it("el − resta de a medio bloque y no baja de 0,5", () => {
     setup();
     fireEvent.click(theoryCheckbox());
     fireEvent.click(minus());
-    expect(screen.getByTestId("chunks-value")).toHaveTextContent("0,5");
+    expect(screen.getByTestId("bloques-value")).toHaveTextContent("0,5");
     fireEvent.click(minus());
-    expect(screen.getByTestId("chunks-value")).toHaveTextContent("0,5");
+    expect(screen.getByTestId("bloques-value")).toHaveTextContent("0,5");
   });
 
-  it("guarda isTheory con la cantidad de chunks elegida", async () => {
+  it("guarda isTheory con la cantidad de bloques elegida", async () => {
     setup("uuid-7");
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
@@ -130,7 +151,7 @@ describe("JournalPrompt — chunks de teoría", () => {
     });
   });
 
-  it("destildar el checkbox descarta los chunks acumulados", async () => {
+  it("destildar el checkbox descarta los bloques acumulados", async () => {
     setup("uuid-7");
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
