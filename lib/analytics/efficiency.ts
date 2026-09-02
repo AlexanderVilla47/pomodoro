@@ -135,7 +135,7 @@ export function blocksPerStudyDay(rows: EfficiencyRow[]): number | null {
  * entero: `work_duration` arranca en 1500s (25 min), así que cualquier piso más
  * alto escondería el caso más común de todos.
  */
-const MIN_SECONDS_FOR_RATE = 15 * 60;
+export const MIN_SECONDS_FOR_RATE = 15 * 60;
 
 /**
  * Distracciones por hora estudiada. Normalizar por tiempo es lo que la vuelve
