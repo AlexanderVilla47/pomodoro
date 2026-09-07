@@ -107,3 +107,101 @@ describe("SettingsPanel — unidad de avance", () => {
     );
   });
 });
+
+describe("SettingsPanel — qué features usar", () => {
+  it("ofrece los dos toggles, tildados por default", () => {
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
+    expect(screen.getByRole("checkbox", { name: /en qué trabajé/i })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /amigos y presencia/i })).toBeChecked();
+  });
+
+  it("el toggle social dice qué comparte, no sólo cómo se llama", () => {
+    // Un toggle de privacidad que no explica qué implica no es consentimiento:
+    // es una palabra suelta que el usuario tiene que adivinar.
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
+    const social = screen.getByRole("checkbox", { name: /amigos y presencia/i });
+    expect(social.closest("label")?.textContent).toMatch(/pueden ver/i);
+  });
+
+  it("destildar el journal lo manda en false", async () => {
+    const onSave = vi.fn();
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={onSave} />);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /en qué trabajé/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferences: expect.objectContaining({ journal: false, social: true }),
+        })
+      )
+    );
+  });
+
+  it("destildar lo social lo manda en false", async () => {
+    const onSave = vi.fn();
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={onSave} />);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /amigos y presencia/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferences: expect.objectContaining({ social: false, journal: true }),
+        })
+      )
+    );
+  });
+
+  it("apagar un toggle NO le borra la unidad al usuario", async () => {
+    // El merge del PR 1, verificado de punta a punta: el panel manda el objeto
+    // entero de preferencias, asi que mandar uno a medias dejaria al usuario
+    // sin unidad por haber destildado una casilla que no tiene nada que ver.
+    const onSave = vi.fn();
+    const conUnidad = {
+      ...DEFAULT_SETTINGS,
+      preferences: { ...DEFAULT_PREFERENCES, unitSingular: "card", unitPlural: "cards" },
+    };
+    render(<SettingsPanel settings={conUnidad} onSave={onSave} />);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /en qué trabajé/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferences: {
+            unitSingular: "card",
+            unitPlural: "cards",
+            journal: false,
+            social: true,
+          },
+        })
+      )
+    );
+  });
+
+  it("arranca de lo guardado y no de los defaults", async () => {
+    const onSave = vi.fn();
+    const apagado = {
+      ...DEFAULT_SETTINGS,
+      preferences: { ...DEFAULT_PREFERENCES, journal: false, social: false },
+    };
+    render(<SettingsPanel settings={apagado} onSave={onSave} />);
+
+    expect(screen.getByRole("checkbox", { name: /en qué trabajé/i })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /amigos y presencia/i })).not.toBeChecked();
+
+    // Y guardar sin tocar nada no los vuelve a prender solos.
+    await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferences: expect.objectContaining({ journal: false, social: false }),
+        })
+      )
+    );
+  });
+});
