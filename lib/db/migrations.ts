@@ -188,6 +188,44 @@ export async function runMigrations(sql: Sql): Promise<void> {
       WHERE seen_at IS NULL
   `;
 
+  // Preferencias por usuario: qué features quiere y en qué unidad mide su
+  // avance. Una columna JSONB y no una booleana por feature: con columnas
+  // sueltas, cada feature nueva es un ALTER TABLE más un campo en cuatro
+  // archivos, y `if (settings.x)` desparramado por los componentes.
+  //
+  // El default es '{}' y NO trae valores: los defaults viven en
+  // `lib/preferences`. Un `DEFAULT true` acá borraría la diferencia entre "el
+  // usuario eligió true" y "el usuario nunca eligió", y esa diferencia no se
+  // recupera nunca más.
+  await sql`
+    ALTER TABLE settings
+      ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}'::jsonb
+  `;
+
+  // Backfill de la unidad de avance, guardado POR DATO y no por fecha.
+  //
+  // La unidad no tiene default a propósito: "bloque" es media página del apunte
+  // de una persona y un usuario nuevo no tiene por qué encontrarse esa palabra.
+  // Pero como el default se aplica a toda fila con `preferences = '{}'`, sacarlo
+  // sin más le dejaría la app en blanco justo al que ya venía cargando bloques.
+  //
+  // Entonces: al que ya cargó bloques alguna vez se le deja "bloque"; al resto
+  // no se le inventa ninguna. Idempotente por el `IS NULL` — la segunda corrida
+  // no toca nada — y el `||` mergea sin pisar el resto del objeto.
+  //
+  // Es un UPDATE de datos, no un ALTER de esquema: revertir el código deja a lo
+  // sumo una unidad configurada que la persona igual habría elegido.
+  await sql`
+    UPDATE settings s
+       SET preferences = s.preferences
+           || '{"unitSingular":"bloque","unitPlural":"bloques"}'::jsonb
+     WHERE s.preferences->>'unitSingular' IS NULL
+       AND EXISTS (
+         SELECT 1 FROM work_logs w
+          WHERE w.user_id = s.user_id AND w.is_theory AND w.chunks > 0
+       )
+  `;
+
   // Habilita Row Level Security en TODAS las tablas del esquema public sin
   // políticas (deny-all). Supabase expone las tablas public en su API REST con
   // la anon key pública; sin RLS quedan abiertas a lectura/escritura desde
