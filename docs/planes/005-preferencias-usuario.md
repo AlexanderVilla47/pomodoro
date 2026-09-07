@@ -52,8 +52,8 @@ Entonces el trabajo no es "esconderle los bloques al que no los usa". Es:
 
 | Parte | Qué hace |
 |---|---|
-| **D** | Generalizar: "bloque" pasa a ser la unidad que el usuario define |
-| **E** | Que los informes sirvan **sin** bloques, y que lo de bloques aparezca solo si hay bloques |
+| **D** | Generalizar: "bloque" deja de existir por default y pasa a ser la unidad que cada usuario define (o ninguna) |
+| **E** | Que los informes sirvan **sin** unidades, y que lo de unidades aparezca solo si hay unidades |
 | **C** | Una capa flaca de preferencias para lo único que ningún dato puede contestar |
 
 ### La regla que decide qué va en cada parte
@@ -73,6 +73,113 @@ Por eso la lista de flags es corta a propósito:
 
 **Dos flags.** Si esta lista crece a seis, el diseño falló: seis flags son 64
 combinaciones de UI y se van a testear tres.
+
+---
+
+## El modelo que ordena todo: dos niveles de estadísticas
+
+Esta es la columna vertebral del plan. Todo lo demás sale de acá.
+
+Pomy mide dos clases de cosas, y hoy están mezcladas en una sola pila detrás del
+mismo filtro. Hay que separarlas:
+
+### Nivel 1 — Universal. Sin configurar nada. Todos, siempre.
+
+Sale **sólo de `sessions`**. Existe desde el pomodoro número uno, sin que el
+usuario sepa qué es una "unidad":
+
+| Métrica | Cómo se calcula |
+|---|---|
+| **Horas estudiadas** | suma de `actual_duration` del período |
+| **Días trabajados** | días distintos con al menos una sesión de trabajo |
+| **Cortes/hora** | `distractions / horas`, con el piso de `MIN_SECONDS_FOR_RATE` |
+
+### Nivel 2 — De ritmo. Sólo si la persona cargó unidades.
+
+Sale de `work_logs.chunks` **más el tiempo de esas sesiones**:
+
+| Métrica | Cómo se calcula |
+|---|---|
+| **min/{unidad}** | `unit_seconds / 60 / unidades` |
+| **{unidades}/día** | unidades ÷ días con avance |
+| **Días con avance** | días distintos con `chunks > 0` (era "días estudiados") |
+
+### Las tres reglas que salen de esta separación
+
+**1. El Nivel 2 no reemplaza al 1: se apila arriba.** Hoy las métricas de bloques
+*compuertan* el panel entero. Después del plan son una capa extra que aparece
+cuando hay con qué calcularla. Nadie ve un panel vacío nunca más.
+
+**2. El Nivel 1 es comparable entre personas. El Nivel 2 es privado por
+definición.** El tiempo es tiempo para todos, pero "min/página" de uno y
+"min/card" de otro **no son la misma magnitud**: son cantidades distintas con el
+mismo nombre de fórmula. Cualquier cosa que compare usuarios — el panel de
+amigos, un ranking futuro — usa Nivel 1 y **nada más**. Hoy
+[`friends.ts`](../../lib/db/queries/friends.ts) compara `today_seconds` y
+`week_seconds`, o sea ya cumple la regla sin saberlo. **Queda escrita para que
+nadie agregue un "ranking de bloques" en seis meses.**
+
+**3. Una métrica no se prende: se calcula o no se calcula.** No hay un toggle de
+"mostrar métricas de ritmo". Si hay unidades cargadas, aparecen. Si no, no. La
+app no le pregunta al usuario si quiere una métrica; mira si la puede calcular.
+
+---
+
+## Qué unidades se permiten (y por qué eso decide las estadísticas)
+
+Si la unidad es texto libre sin reglas, alguien escribe "horas" y Pomy le muestra
+orgullosamente **min/hora = 60**, para siempre. Un número perfectamente correcto
+y perfectamente inútil.
+
+Entonces: **no toda palabra sirve como unidad.** Para que `min/unidad` signifique
+algo, la unidad tiene que ser:
+
+- **algo que se produce**, no una medida del tiempo que se tardó
+- **razonablemente parejo en tamaño** entre una y otra, o el promedio es ruido
+
+### La lista guiada (un tap, sin tipear)
+
+`páginas` · `ejercicios` · `cards` · `problemas` · `capítulos` · `temas` ·
+`videos` · `prácticos` · `bloques`
+
+Cada preset trae **singular y plural ya escritos**, así que el que elige de la
+lista nunca ve un campo de plural ni se topa con `pluralizeEs`.
+
+### Texto libre, con una puerta
+
+El que cuenta katas, commits o partituras tiene que poder escribirlo. Se permite
+cualquier texto de 1 a 24 caracteres **menos** las palabras que rompen la
+métrica:
+
+```
+hora, horas, minuto, minutos, sesión, sesiones,
+pomodoro, pomodoros, día, días, semana, semanas
+```
+
+Con un mensaje que enseña en vez de sólo negar:
+
+> *Pomy ya mide tu tiempo solo. Elegí algo que **produzcas**: páginas,
+> ejercicios, cards…*
+
+Es una función pura, `validateUnit()`, comparando sin tildes ni mayúsculas. La
+regla vive en `lib/preferences/` y no en el componente: si mañana el mismo texto
+entra por otro lado, la regla viaja con él.
+
+### Cambiar de unidad a mitad de camino
+
+Si alguien usó "páginas" un mes y se pasa a "cards", **sus `chunks` históricos
+siguen siendo páginas** y el promedio los mezcla en silencio. Es la trampa obvia
+de que la unidad viva en `settings` y no en cada fila.
+
+Solución de este plan: **avisar al cambiar**, no impedirlo.
+
+> *Ya cargaste 47 páginas. Si cambiás la unidad, ese historial se va a mezclar
+> con las cards nuevas en los promedios.*
+
+La solución exacta sería guardar la unidad **en cada `work_log`** y agrupar los
+informes por unidad. Es una columna más y una dimensión más en todo el análisis:
+**desproporcionado para un caso que la mayoría hace cero veces.** Queda anotado
+como la salida si alguna vez molesta de verdad.
 
 ---
 
@@ -103,8 +210,9 @@ ALTER TABLE settings
 ```
 
 Va al final de `runMigrations` en
-[`lib/db/migrations.ts`](../../lib/db/migrations.ts), **antes** del bloque que
-activa RLS (ese bloque itera `pg_tables` y tiene que quedar último).
+[`lib/db/migrations.ts`](../../lib/db/migrations.ts), seguida del **backfill de
+unidad** (más abajo), y las dos **antes** del bloque que activa RLS — ese bloque
+itera `pg_tables` y tiene que quedar último.
 
 **Una columna JSONB y no una columna por flag.** Con columnas sueltas, cada
 feature nueva es un `ALTER TABLE` más un campo en cuatro archivos. Con JSONB, es
@@ -121,10 +229,16 @@ configurable es el **rótulo**, no la columna.
 
 ```ts
 export interface Preferences {
-  /** Rótulo singular de la unidad de avance. "bloque", "página", "ejercicio". */
-  unitSingular: string;
+  /**
+   * Rótulo singular de la unidad de avance. `null` = sin configurar.
+   *
+   * ⚠️ NO tiene default. "bloque" es media página del apunte de una persona:
+   * existe en su cocina, no en el mundo. Un usuario nuevo que lee "medí el
+   * avance en bloques" no tiene forma de saber qué le están preguntando.
+   */
+  unitSingular: string | null;
   /** Plural. Se guarda aparte porque el español no se pluraliza a ciegas. */
-  unitPlural: string;
+  unitPlural: string | null;
   /** ¿Preguntar "¿en qué trabajaste?" al terminar cada pomodoro? */
   journal: boolean;
   /** Presencia + amigos + cheers. Es privacidad, no es gusto. */
@@ -132,20 +246,62 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  unitSingular: "bloque",
-  unitPlural: "bloques",
+  unitSingular: null,   // ← sin unidad hasta que la persona elija una
+  unitPlural: null,
   journal: true,
   social: true,
 };
 
 export const MAX_UNIT_LENGTH = 24;
 
+/** Presets de la lista guiada, con las dos formas ya resueltas. */
+export const UNIT_PRESETS: Array<{ singular: string; plural: string }>;
+
+/** Palabras que rompen la métrica: son tiempo, no producto. */
+export const BLOCKED_UNITS: readonly string[];
+
 /** JSONB crudo → objeto completo. Nunca devuelve nada parcial. */
 export function resolvePreferences(raw: unknown): Preferences;
+
+/** `{ ok: true }` | `{ ok: false; reason: "empty" | "too-long" | "is-time" }` */
+export function validateUnit(raw: string): UnitValidation;
 
 /** Plural del español, con las reglas que cubren el 95% de lo que alguien tipea. */
 export function pluralizeEs(singular: string): string;
 ```
+
+`validateUnit` compara **sin tildes y sin mayúsculas** contra `BLOCKED_UNITS`
+(`"Días"` y `"dias"` son la misma palabra). Una unidad inválida **no se guarda**:
+`resolvePreferences` la descarta y cae a `null`, que es lo mismo que no haber
+configurado nada.
+
+### El backfill: que el cambio de default no le saque la unidad a nadie
+
+Sacar el default `"bloque"` es correcto para los que vienen — y **le rompe la app
+al que ya venía cargando bloques**, porque el default se aplica a toda fila con
+`preferences = '{}'`.
+
+Se arregla con un backfill guardado por dato, no por fecha:
+
+```sql
+UPDATE settings s
+   SET preferences = s.preferences
+       || '{"unitSingular":"bloque","unitPlural":"bloques"}'::jsonb
+ WHERE s.preferences->>'unitSingular' IS NULL
+   AND EXISTS (
+     SELECT 1 FROM work_logs w
+      WHERE w.user_id = s.user_id AND w.is_theory AND w.chunks > 0
+   )
+```
+
+Lee: *"al que ya cargó bloques alguna vez, dejale 'bloque' como unidad; al resto,
+no le inventes ninguna."*
+
+Es idempotente: el `IS NULL` hace que la segunda corrida no toque nada, y el `||`
+mergea sin pisar el resto del objeto. **Y es un `UPDATE` de datos, no un `ALTER`
+de esquema**: revertir el código deja a lo sumo una unidad configurada que la
+persona igual habría elegido. No entra en la categoría de migración irreversible
+de [`CLAUDE.md`](../../CLAUDE.md).
 
 **Los defaults viven acá y no en la base.** Es la decisión de diseño central de
 este PR: si el default fuera `DEFAULT true` en Postgres, el día que quieras
@@ -215,12 +371,16 @@ decisión dependa de dos cosas, se cambia en un archivo y no en quince.
 ### Tests del PR 1 (TDD, en este orden)
 
 1. `lib/preferences/__tests__/preferences.test.ts`
-   - `resolvePreferences({})` → `DEFAULT_PREFERENCES`
+   - `resolvePreferences({})` → `DEFAULT_PREFERENCES`, con **`unitSingular` en `null`**
    - `resolvePreferences(null | "texto" | 42)` → `DEFAULT_PREFERENCES`
    - respeta un valor parcial y completa el resto con defaults
-   - recorta espacios, capea a `MAX_UNIT_LENGTH`, cae al default si queda vacío
+   - recorta espacios, capea a `MAX_UNIT_LENGTH`, cae a `null` si queda vacío
+   - **descarta una unidad bloqueada guardada en la base** (`"horas"` → `null`)
    - ignora un `journal: "sí"` (no booleano) y usa el default
+   - `validateUnit`: acepta `"kata"`; rechaza `""`, 25 caracteres, `"horas"`,
+     `"Días"` y `"SESIONES"` (sin tildes ni mayúsculas)
    - `pluralizeEs`: los cuatro casos de la tabla
+   - los `UNIT_PRESETS` pasan todos `validateUnit`
 2. `lib/db/queries/__tests__/settings.test.ts` (nuevo)
    - `getSettings` devuelve preferencias resueltas con la columna en `{}`
    - `upsertSettings` **mergea**: patchear `{ journal: false }` conserva `unitSingular`
@@ -245,7 +405,42 @@ casi todo renombrar en la capa de presentación.
 
 ### Dónde está "bloque" hardcodeado
 
-[`components/JournalPrompt/index.tsx`](../../components/JournalPrompt/index.tsx):
+[`components/JournalPrompt/index.tsx`](../../components/JournalPrompt/index.tsx)
+tiene **dos estados ahora**, según haya unidad configurada o no.
+
+#### Sin unidad configurada (el usuario nuevo): no hay casilla
+
+Hoy un recién llegado se come `☐ Estudié teoría por bloques` sin tener idea de
+qué es un bloque. **Esa casilla desaparece.** En su lugar, una línea discreta al
+pie del modal:
+
+```
++ Medir mi avance
+```
+
+Al tocarla, la configuración se abre **ahí mismo, adentro del modal** — no manda
+a Configuración y no interrumpe el flujo:
+
+```
+¿En qué medís tu avance?
+[páginas] [ejercicios] [cards] [problemas]
+[capítulos] [temas] [videos] [prácticos] [bloques]
+o escribí la tuya:  [________]
+```
+
+Elige un chip → queda guardado en preferencias, la casilla aparece con **su**
+unidad, y desde el pomodoro siguiente ya está.
+
+**Por qué inline y no en Configuración**: el momento en que a alguien se le ocurre
+que quiere medir su avance es **justo cuando terminó de trabajar y le preguntan
+qué hizo**. Mandarlo a otra pantalla en ese momento es perder la intención. Y
+esconderlo sólo en Configuración lo vuelve invisible: nadie entra a Configuración
+a ver qué hay.
+
+⚠️ **La línea tiene que ser discreta, no un cartel.** Es una invitación, no un
+pedido: la app funciona perfecta sin que nadie la toque nunca.
+
+#### Con unidad configurada: como hoy, con su rótulo
 
 - `"Estudié teoría por bloques"` → `Medí el avance en ${unitPlural}`
 - `{chunks === 1 ? "bloque" : "bloques"}` → `unitSingular` / `unitPlural`
@@ -268,29 +463,50 @@ tocan. Son código, no UI.
 
 ### SettingsPanel
 
-Sección nueva, arriba del botón de guardar:
+Sección nueva, arriba del botón de guardar. **Mismo selector que el del journal**
+— un componente compartido, `UnitPicker`, para que no haya dos UIs de lo mismo
+que se desincronizan:
 
 ```
-Cómo medís tu avance
-  [ bloque      ]  [ bloques     ]
-   singular         plural
+Cómo medís tu avance                    [ Sin unidad ▾ ]
+  [páginas] [ejercicios] [cards] [problemas] …
+  o escribí la tuya:  [__________]  plural: [__________]
+
+  ☐ No medir mi avance      ← vuelve a null, saca la casilla del journal
 ```
 
-El campo plural se autocompleta con `pluralizeEs(singular)` **mientras el usuario
-no lo haya editado a mano**; una vez tocado, deja de seguirlo. Un flag local
-`pluralTouched` alcanza.
+- **El plural sólo aparece en el camino de texto libre.** Los presets ya lo traen
+  resuelto: el que elige un chip nunca ve ese campo. Es el 90% de los casos.
+- En texto libre, el plural se autocompleta con `pluralizeEs(singular)` **mientras
+  no se lo edite a mano**; una vez tocado, deja de seguirlo (`pluralTouched`).
+- Validación con `validateUnit`, mostrando el mensaje que enseña cuando alguien
+  escribe "horas". Reusa el patrón de `error` que el panel ya tiene.
 
-Validación: 1–24 caracteres, no vacío tras `trim()`. Reusa el patrón de `error`
-que el panel ya tiene.
+#### El aviso al cambiar de unidad
+
+Si ya hay `chunks` cargados y se cambia la unidad, antes de guardar:
+
+> *Ya cargaste 47 páginas. Si cambiás la unidad, ese historial se va a mezclar
+> con las cards nuevas en los promedios.*
+
+El conteo sale de un `GET /api/stats/efficiency` que el panel ya sabe pedir; si
+falla, el aviso se muestra sin el número. **Avisa, no impide** — es información
+del usuario, la decisión es suya.
 
 ### Tests del PR 2
 
-1. `JournalPrompt.test.tsx`: con `preferences.unitSingular = "página"` el stepper
-   dice `"páginas"` en plural y `"página"` en 1; el aria-label acompaña
-2. `StudyReports.test.tsx`: los rótulos de métrica salen `min/página`, `páginas/día`
-3. `SettingsPanel.test.tsx`: tipear `"ejercicio"` prellena `"ejercicios"`;
-   editar el plural a mano y volver a tocar el singular **no** pisa lo editado;
-   guardar manda `preferences: { unitSingular, unitPlural }`
+1. `JournalPrompt.test.tsx`
+   - **sin unidad**: no existe la casilla; existe `"+ Medir mi avance"`
+   - tocar esa línea abre el selector; elegir `"cards"` guarda las preferencias
+   - **con unidad**: el stepper dice `"páginas"` en plural y `"página"` en 1, y
+     el `aria-label` acompaña
+2. `StudyReports.test.tsx`: los rótulos salen `min/página`, `páginas/día`
+3. `UnitPicker.test.tsx` (nuevo)
+   - elegir un preset guarda singular **y** plural sin mostrar campo de plural
+   - texto libre: `"ejercicio"` prellena `"ejercicios"`; editar el plural a mano y
+     volver a tocar el singular **no** pisa lo editado
+   - `"horas"` muestra el mensaje y no guarda
+   - "No medir mi avance" manda `unitSingular: null`
 
 ---
 
@@ -344,25 +560,58 @@ Ojo con dos cosas:
   real, no contra el subconjunto de teoría
 - `Summary` gana `totalUnits: number`, para que la UI pueda preguntar "¿este
   usuario mide algo?" sin adivinar desde un `null`
-- `studyDays` no cambia: sigue contando días con `total_chunks > 0`
+- `studyDays` no cambia de cálculo (días con `total_chunks > 0`), pero **cambia de
+  rótulo a "días con avance"**: ahora convive con "días trabajados" y confundirlos
+  sería peor que no tenerlos
+
+**Y las dos métricas nuevas del Nivel 1**, que son las que vuelven útil el panel
+para quien no mide unidades:
+
+```ts
+/** Horas de trabajo del período. El dato más obvio, y hoy los informes no lo muestran. */
+export function hoursStudied(rows: EfficiencyRow[]): number;
+
+/**
+ * Días distintos con al menos una sesión de trabajo.
+ *
+ * NO es `studyDays`: ese cuenta días con unidades cargadas. Éste cuenta días que
+ * te sentaste, midas o no midas algo. Deduplica por fecha igual que studyDays,
+ * porque la query devuelve una fila por día + materia.
+ */
+export function workedDays(rows: EfficiencyRow[]): number;
+```
+
+Las dos entran a `Summary` como `hours` y `workedDays`. **Ninguna necesita una
+columna nueva**: salen de `total_seconds` y de `day`, que ya vienen en la fila.
 
 ### `StudyReports.tsx`
 
-`METRICS` gana un campo declarativo:
+`METRICS` gana un campo declarativo que **es el Nivel de la métrica**:
 
 ```ts
-requires: "units" | "always"
+tier: "always" | "units"
 ```
 
-`min/unidad`, `unidades/día` y `días estudiados` son `"units"`;
-`cortes/hora` es `"always"`.
+| Métrica | `id` | tier | dirección |
+|---|---|---|---|
+| horas estudiadas | `hours` | `always` | más es mejor |
+| días trabajados | `worked-days` | `always` | más es mejor |
+| cortes/hora | `distractions-per-hour` | `always` | menos es mejor |
+| min/{unidad} | `minutes-per-block` | `units` | menos es mejor |
+| {unidades}/día | `blocks-per-day` | `units` | más es mejor |
+| días con avance | `study-days` | `units` | más es mejor |
 
 Luego:
 
 ```ts
 const hasUnits = periods.some((p) => p.totalUnits > 0);
-const visibleMetrics = METRICS.filter((m) => m.requires === "always" || hasUnits);
+const visibleMetrics = METRICS.filter((m) => m.tier === "always" || hasUnits);
 ```
+
+**Tres métricas de Nivel 1, no una.** Este es el arreglo que faltaba: con sólo
+`cortes/hora` visible, el usuario sin unidades entraba a informes y veía **un
+número solo flotando** — mejor que el panel vacío de hoy, pero muy lejos de "acá
+está tu mes".
 
 Y con el mismo `hasUnits` se compuertan las dos series de barras y el desglose
 "Por materia" (que muestra `min/unidad` y sin unidades no dice nada).
@@ -378,7 +627,7 @@ deja de ser verdad. Queda para el caso real de "no hay ninguna sesión de trabaj
 todavía". Texto sugerido:
 
 > Todavía no hay sesiones para medir.
-> Terminá un pomodoro y acá vas a ver tu tiempo y tus cortes.
+> Terminá un pomodoro y acá vas a ver tus horas, tus días y tus cortes.
 
 Y cuando hay sesiones pero no unidades, **no se muestra ningún aviso**: se ven las
 métricas que aplican y nada más. El [004](004-ajustes-informes.md) ya cerró esta
@@ -391,15 +640,20 @@ muestre menos cosas es la respuesta, no un párrafo que lo explique.
    - `weightedAverage` usa `unit_seconds`: una fila con `total_seconds: 6000`,
      `unit_seconds: 3000`, `total_chunks: 2` da **25**, no 50 ← el test clave
    - `distractionsPerHour` cuenta el tiempo total, incluidas sesiones sin unidades
-   - `summarize` devuelve `totalUnits`
+   - `hoursStudied` suma `total_seconds` y convierte
+   - `workedDays` **deduplica por día** (dos materias el mismo día = un día) y
+     **cuenta días sin unidades**, a diferencia de `studyDays` — el mismo set de
+     filas tiene que dar `workedDays: 3` y `studyDays: 1`
+   - `summarize` devuelve `totalUnits`, `hours` y `workedDays`
    - filas sin unidades: `minutesPerBlock`/`blocksPerDay` en `null`, `studyDays` 0,
-     `distractionsPerHour` con número
+     y `hours`/`workedDays`/`distractionsPerHour` **con número**
 2. `lib/db/queries/__tests__/stats.test.ts`: la query incluye sesiones sin
    `work_log` (sobre el tag `sql` mockeado, verificando la forma del fragmento)
 3. `StudyReports.test.tsx`
-   - sin unidades: se ve `metric-distractions-per-hour`, **no** se ven
-     `metric-minutes-per-block` ni las series ni `label-breakdown`
-   - con unidades: se ven las cuatro
+   - sin unidades: se ven `metric-hours`, `metric-worked-days` y
+     `metric-distractions-per-hour`; **no** se ven `metric-minutes-per-block`,
+     `metric-blocks-per-day`, `metric-study-days`, las series ni `label-breakdown`
+   - con unidades: se ven las seis
    - sin sesiones: `reports-empty`
 
 ---
@@ -472,8 +726,8 @@ que no explica qué comparte no es un consentimiento.
 
 | Archivo | PR | Qué pasa |
 |---|---|---|
-| `lib/db/migrations.ts` | 1 | `+ preferences JSONB` (antes del bloque RLS) |
-| `lib/preferences/index.ts` | 1 | **nuevo** — resolver + `pluralizeEs` |
+| `lib/db/migrations.ts` | 1 | `+ preferences JSONB` + backfill de unidad (antes del bloque RLS) |
+| `lib/preferences/index.ts` | 1 | **nuevo** — resolver, `validateUnit`, presets, `pluralizeEs` |
 | `lib/preferences/__tests__/preferences.test.ts` | 1 | **nuevo** |
 | `lib/db/queries/settings.ts` | 1 | `Settings.preferences`, resolver al leer, merge al escribir |
 | `lib/db/queries/__tests__/settings.test.ts` | 1 | **nuevo** |
@@ -481,11 +735,13 @@ que no explica qué comparte no es un consentimiento.
 | `app/api/__tests__/settings.test.ts` | 1 | casos nuevos |
 | `hooks/usePreferences.ts` | 1 | **nuevo** |
 | `context/__tests__/SettingsContext.test.tsx` | 1 | fixture |
-| `components/JournalPrompt/index.tsx` | 2 | rótulos + `testid` renombrado |
-| `components/Settings/SettingsPanel.tsx` | 2, 4 | unidad; después los toggles |
+| `components/Settings/UnitPicker.tsx` | 2 | **nuevo** — compartido journal + settings |
+| `components/Settings/__tests__/UnitPicker.test.tsx` | 2 | **nuevo** |
+| `components/JournalPrompt/index.tsx` | 2 | dos estados (con/sin unidad) + `testid` renombrado |
+| `components/Settings/SettingsPanel.tsx` | 2, 4 | `UnitPicker` + aviso de cambio; después los toggles |
 | `lib/db/queries/stats.ts` | 3 | query invertida + `unit_seconds` |
-| `lib/analytics/efficiency.ts` | 3 | `unit_seconds`, `totalUnits`, `weightedAverage` |
-| `components/Dashboard/StudyReports.tsx` | 2, 3 | rótulos; después `requires` |
+| `lib/analytics/efficiency.ts` | 3 | `unit_seconds`, `totalUnits`, `hoursStudied`, `workedDays` |
+| `components/Dashboard/StudyReports.tsx` | 2, 3 | rótulos; después `tier` + 2 métricas nuevas |
 | `components/HomeClient.tsx` | 4 | montaje condicional |
 | `components/__tests__/HomeClient.preferences.test.tsx` | 4 | **nuevo** |
 
@@ -494,17 +750,24 @@ que no explica qué comparte no es un consentimiento.
 `npm test` y `npm run typecheck` en verde en cada PR (**nunca `npm run build`**).
 Y a mano, después del PR 4:
 
-1. **Usuario nuevo, sin tocar nada**: hace un pomodoro, le aparece el journal, no
-   tilda la unidad. Entra a informes → **ve cortes/hora y su tiempo**, no un
-   panel vacío. ← es el bug que motivó todo el plan
-2. **Cambiar la unidad a "página"**: el stepper del journal y los rótulos de los
-   informes dicen "página"/"páginas" en todos lados
-3. **Apagar el journal**: termina un pomodoro y no aparece nada. Los informes
-   siguen mostrando tiempo y cortes
-4. **Apagar lo social**: desaparece el tab Amigos. Desde otra cuenta amiga,
+1. **Usuario nuevo, sin tocar nada**: hace un pomodoro. En el journal **no hay
+   ninguna casilla de bloques** — sólo la línea discreta "Medir mi avance".
+   Entra a informes → **ve horas, días trabajados y cortes/hora**, no un panel
+   vacío. ← es el bug que motivó todo el plan
+2. **Configurar la unidad desde el journal**: tocar "Medir mi avance", elegir
+   "cards", guardar. El pomodoro siguiente ya muestra la casilla con "cards"
+3. **Escribir "horas" como unidad**: sale el mensaje y no se guarda
+4. **Los informes crecen solos**: después de cargar la primera unidad, entrar a
+   informes y ver que aparecieron min/card, cards/día y días con avance — sin
+   haber prendido nada
+5. **Apagar el journal**: termina un pomodoro y no aparece nada. Los informes
+   siguen mostrando horas, días y cortes
+6. **Apagar lo social**: desaparece el tab Amigos. Desde otra cuenta amiga,
    confirmar que a los ~2 minutos figurás `offline` — sin endpoint de limpieza
-5. **Merge de preferencias**: configurar la unidad, después apagar el journal,
+7. **Merge de preferencias**: configurar la unidad, después apagar el journal,
    recargar → la unidad sigue ahí
+8. **El backfill**: con la cuenta que ya venía cargando bloques, confirmar que
+   **después del deploy la unidad sigue siendo "bloque"** y no quedó en blanco
 
 ## Decisiones tomadas (y las descartadas)
 
@@ -519,9 +782,24 @@ Y a mano, después del PR 4:
 - **El plural se guarda, no se calcula en el render.** `pluralizeEs` adivina y
   falla con préstamos ("card" → "cardes"); mostrando la adivinanza en un campo
   editable, el usuario la corrige una vez. Calculándola en silencio, no la puede
-  corregir nunca.
+  corregir nunca. Y los presets lo traen resuelto, así que el 90% no lo ve.
+- **La unidad NO tiene default.** Es la corrección más importante de esta versión
+  del plan: `"bloque"` como default seguía siendo la app de una persona hablándole
+  a todo el mundo en su idioma privado. Sin unidad, Pomy funciona entero; con
+  unidad, suma una capa. El costo es descubribilidad, y se paga con la invitación
+  inline en el journal — **no** escondiéndola sólo en Configuración.
+- **Se permiten unidades libres, pero no cualquiera.** Texto libre sin reglas deja
+  escribir "horas" y produce `min/hora = 60`: correcto y basura. La blocklist es
+  chica y el mensaje enseña en vez de sólo negar.
+- **Cambiar de unidad avisa, no impide, y no reescribe el historial.** Guardar la
+  unidad en cada `work_log` sería exacto y es una columna más y una dimensión más
+  en todo el análisis, para un caso que la mayoría hace cero veces.
 - **`social` arranca en `true` aunque lo correcto sea `false`.** Documentado
   arriba, con la condición exacta para cambiarlo.
 - **Sin presets ni perfiles ("modo simple / estudio / trabajo").** Con dos flags
   no hay nada que agrupar; un preset acá sería ceremonia sobre dos checkboxes.
   Si la lista crece, se reconsidera — pero que crezca ya es la señal de alarma.
+- **Las métricas de unidad nunca se comparan entre personas.** Regla del modelo de
+  dos niveles: el Nivel 1 es comparable, el Nivel 2 es privado. No es una decisión
+  de UI, es una propiedad de la magnitud — "min/página" y "min/card" tienen el
+  mismo nombre de fórmula y miden cosas distintas.
