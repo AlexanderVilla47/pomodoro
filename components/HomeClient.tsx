@@ -11,6 +11,8 @@ import { Confetti } from "@/components/Confetti";
 import { LabelSelector } from "@/components/LabelSelector";
 import type { Label } from "@/components/LabelSelector";
 import { useSettings } from "@/hooks/useSettings";
+import { usePreferences } from "@/hooks/usePreferences";
+import type { UnitValue } from "@/components/Settings/UnitPicker";
 import { useWorkLogger } from "@/hooks/useWorkLogger";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { requestNotificationPermission } from "@/lib/notifications";
@@ -44,6 +46,7 @@ function tabCls(active: boolean) {
 
 export function HomeClient() {
   const { settings, updateSettings } = useSettings();
+  const preferences = usePreferences();
   const [statsVersion, setStatsVersion] = useState(0);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -61,6 +64,28 @@ export function HomeClient() {
   const [cheerReveal, setCheerReveal] = useState<{ names: string[]; count: number } | null>(null);
 
   const { saveWorkLog } = useWorkLogger();
+
+  const unit: UnitValue | null =
+    preferences.unitSingular && preferences.unitPlural
+      ? { singular: preferences.unitSingular, plural: preferences.unitPlural }
+      : null;
+
+  // La unidad se puede elegir desde el journal, sin pasar por Configuración.
+  // Se manda el objeto entero de preferencias porque el patch se MERGEA en el
+  // servidor: mandar sólo la unidad ya alcanzaría, pero así el tipo del patch
+  // queda igual al de Configuración y no hay dos formas de escribir lo mismo.
+  const handleUnitChange = useCallback(
+    (next: UnitValue | null) => {
+      updateSettings({
+        preferences: {
+          ...preferences,
+          unitSingular: next?.singular ?? null,
+          unitPlural: next?.plural ?? null,
+        },
+      });
+    },
+    [preferences, updateSettings]
+  );
 
   // Vacía las dos colas offline en orden (sesiones antes que work logs) y
   // refresca lo que se ve sólo si algo efectivamente se sincronizó.
@@ -229,6 +254,8 @@ export function HomeClient() {
                   <div className="w-full max-w-sm mx-4">
                     <JournalPrompt
                       sessionClientId={pendingClientId}
+                      unit={unit}
+                      onUnitChange={handleUnitChange}
                       variant="desktop"
                       onClose={handleJournalClose}
                       onSaved={handleJournalSaved}
@@ -277,6 +304,7 @@ export function HomeClient() {
                   {desktopRightTab === "stats" ? (
                     <Dashboard
                       refreshTrigger={statsVersion}
+                      unit={unit}
                       onViewChange={setDesktopDashboardView}
                     />
                   ) : desktopRightTab === "history" ? (
@@ -355,6 +383,7 @@ export function HomeClient() {
                 <div className={mobileDashboardView === "analysis" ? "flex-1 min-h-0" : ""}>
                   <Dashboard
                     refreshTrigger={statsVersion}
+                    unit={unit}
                     onViewChange={setMobileDashboardView}
                   />
                 </div>
@@ -446,6 +475,8 @@ export function HomeClient() {
           {/* Mobile journal prompt — fixed overlay, outside tab panels */}
           <JournalPrompt
             sessionClientId={pendingClientId}
+            unit={unit}
+            onUnitChange={handleUnitChange}
             variant="mobile"
             onClose={handleJournalClose}
             onSaved={handleJournalSaved}
