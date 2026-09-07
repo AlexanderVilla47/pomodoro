@@ -10,10 +10,22 @@ import {
   type Direction,
   type Summary,
 } from "@/lib/analytics/efficiency";
+import type { UnitValue } from "@/components/Settings/UnitPicker";
 
 interface StudyReportsProps {
   onBack: () => void;
+  /** La unidad de avance del usuario. null = dejó de medir (o nunca midió). */
+  unit: UnitValue | null;
 }
+
+/**
+ * Con qué rotular cuando no hay unidad configurada.
+ *
+ * Pasa si alguien cargó datos y después dejó de medir: los chunks viejos siguen
+ * ahí y hay que llamarlos de alguna forma. "unidad" es genérico pero nunca es
+ * incorrecto, que es exactamente lo que se necesita para un rótulo de fallback.
+ */
+const UNIDAD_GENERICA: UnitValue = { singular: "unidad", plural: "unidades" };
 
 /**
  * Las cuatro métricas, con su dirección de mejora declarada.
@@ -25,35 +37,40 @@ interface StudyReportsProps {
 const METRICS: Array<{
   id: string;
   field: keyof Summary;
-  label: string;
+  /**
+   * Función y no string: el rótulo lleva la unidad que eligió el usuario, y esa
+   * unidad no se conoce hasta el render. Los `id` en cambio NO se tocan — son
+   * identidad (alimentan los data-testid), no rótulo.
+   */
+  label: (u: UnitValue) => string;
   hint: string;
   direction: Direction;
 }> = [
   {
     id: "minutes-per-block",
     field: "minutesPerBlock",
-    label: "min/bloque",
+    label: (u) => `min/${u.singular}`,
     hint: "menos es mejor",
     direction: "lower-is-better",
   },
   {
     id: "blocks-per-day",
     field: "blocksPerDay",
-    label: "bloques/día",
+    label: (u) => `${u.plural}/día`,
     hint: "más es mejor",
     direction: "higher-is-better",
   },
   {
     id: "study-days",
     field: "studyDays",
-    label: "días estudiados",
+    label: () => "días estudiados",
     hint: "más es mejor",
     direction: "higher-is-better",
   },
   {
     id: "distractions-per-hour",
     field: "distractionsPerHour",
-    label: "cortes/hora",
+    label: () => "cortes/hora",
     hint: "menos es mejor",
     direction: "lower-is-better",
   },
@@ -86,7 +103,8 @@ function fmtPeriod(start: string, granularity: Granularity): string {
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
-export function StudyReports({ onBack }: StudyReportsProps) {
+export function StudyReports({ onBack, unit }: StudyReportsProps) {
+  const u = unit ?? UNIDAD_GENERICA;
   const [rows, setRows] = useState<EfficiencyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -192,8 +210,8 @@ export function StudyReports({ onBack }: StudyReportsProps) {
           <p data-testid="reports-empty" className="text-xs text-white/30 text-center py-4 leading-relaxed">
             Todavía no hay nada para medir.
             <br />
-            Los informes miran sólo las sesiones marcadas como{" "}
-            <span className="text-white/50">teoría</span> con bloques cargados.
+            Los informes miran sólo las sesiones en las que cargaste{" "}
+            <span className="text-white/50">{u.plural}</span>.
           </p>
         )}
 
@@ -264,7 +282,7 @@ export function StudyReports({ onBack }: StudyReportsProps) {
                       <span className="text-lg font-bold text-white" data-testid={`metric-${m.id}`}>
                         {fmt(value)}
                       </span>
-                      <span className="text-[11px] text-white/50 flex-1">{m.label}</span>
+                      <span className="text-[11px] text-white/50 flex-1">{m.label(u)}</span>
                       {delta && delta.trend && (
                         <span
                           data-testid={`trend-${m.id}`}
@@ -288,7 +306,8 @@ export function StudyReports({ onBack }: StudyReportsProps) {
             {periods.length > 1 &&
               (["minutesPerBlock", "blocksPerDay"] as const).map((field) => {
                 const max = Math.max(...periods.map((p) => p[field] ?? 0), 1);
-                const title = field === "minutesPerBlock" ? "min/bloque" : "bloques/día";
+                const title =
+                  field === "minutesPerBlock" ? `min/${u.singular}` : `${u.plural}/día`;
                 return (
                   <div
                     key={field}
@@ -342,7 +361,7 @@ export function StudyReports({ onBack }: StudyReportsProps) {
                     <span className="text-[11px] text-white/80 font-medium">
                       {fmt(l.minutesPerBlock)}
                     </span>
-                    <span className="text-[10px] text-white/30">min/bloque</span>
+                    <span className="text-[10px] text-white/30">min/{u.singular}</span>
                   </div>
                 ))}
               </div>

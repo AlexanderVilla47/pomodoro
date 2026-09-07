@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { StatsCard } from "./StatsCard";
 import { StudyReports } from "./StudyReports";
+import type { UnitValue } from "@/components/Settings/UnitPicker";
 
 interface Stats {
   today: { count: number; total_seconds: number; distraction_count: number };
@@ -13,6 +14,8 @@ export type DashboardView = "cards" | "analysis";
 
 interface DashboardProps {
   refreshTrigger: number;
+  /** La unidad de avance del usuario, para rotular los informes. */
+  unit: UnitValue | null;
   /**
    * El padre necesita saberlo para estirar el panel: en desktop el bloque de
    * stats está capado en `max-h-[45%]`, que no alcanza para los informes.
@@ -25,7 +28,7 @@ function getTzOffset(): number {
 }
 
 
-export function Dashboard({ refreshTrigger, onViewChange }: DashboardProps) {
+export function Dashboard({ refreshTrigger, unit, onViewChange }: DashboardProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [view, setView] = useState<DashboardView>("cards");
 
@@ -52,7 +55,7 @@ export function Dashboard({ refreshTrigger, onViewChange }: DashboardProps) {
 
   // ── Vista: informes ──
   if (view === "analysis") {
-    return <StudyReports onBack={closeReports} />;
+    return <StudyReports onBack={closeReports} unit={unit} />;
   }
 
   // ── Vista: tarjetas ──
