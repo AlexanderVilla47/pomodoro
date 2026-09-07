@@ -2,10 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { WorkLogPayload } from "@/hooks/useWorkLogger";
+import { UnitPicker, type UnitValue } from "@/components/Settings/UnitPicker";
 
 interface JournalPromptProps {
   /** UUID de la sesión. null = no hay sesión esperando respuesta. */
   sessionClientId: string | null;
+  /** La unidad de avance del usuario. null = todavía no eligió ninguna. */
+  unit: UnitValue | null;
+  /** Guarda la unidad elegida acá adentro, sin pasar por Configuración. */
+  onUnitChange: (next: UnitValue | null) => void;
   onClose: () => void;
   onSaved: () => void;
   saveWorkLog: (p: WorkLogPayload) => Promise<void>;
@@ -29,6 +34,8 @@ function fmtNumber(n: number): string {
 
 export function JournalPrompt({
   sessionClientId,
+  unit,
+  onUnitChange,
   onClose,
   onSaved,
   saveWorkLog,
@@ -41,6 +48,7 @@ export function JournalPrompt({
   const [error, setError] = useState<string | null>(null);
   const [isTheory, setIsTheory] = useState(false);
   const [chunks, setChunks] = useState(1);
+  const [pickingUnit, setPickingUnit] = useState(false);
 
   const visible = sessionClientId !== null;
 
@@ -53,6 +61,7 @@ export function JournalPrompt({
       setError(null);
       setIsTheory(false);
       setChunks(1);
+      setPickingUnit(false);
     }
   }, [sessionClientId]);
 
@@ -110,19 +119,30 @@ export function JournalPrompt({
         sessionClientId,
         notes: notes.trim() || null,
         topics: finalTopics,
-        isTheory,
-        chunks: isTheory ? chunks : null,
+        isTheory: unit !== null && isTheory,
+        chunks: unit !== null && isTheory ? chunks : null,
       });
       onSaved();
     } catch {
       setError("Error al guardar. Intentá de nuevo.");
       setSaving(false);
     }
-  }, [sessionClientId, saving, notes, topics, chipDraft, isTheory, chunks, saveWorkLog, onSaved]);
+  }, [sessionClientId, saving, notes, topics, chipDraft, isTheory, chunks, unit, saveWorkLog, onSaved]);
 
   const notesOver = notes.length > MAX_NOTES;
   const topicsOver = topics.length >= MAX_TOPICS;
   const canSave = !saving && !notesOver && (!isTheory || chunks >= CHUNK_MIN);
+
+  const handleUnitChange = useCallback(
+    (next: UnitValue | null) => {
+      onUnitChange(next);
+      setPickingUnit(false);
+      // Elegir la unidad ES declarar que esta sesión se mide: dar el segundo
+      // paso a mano sería pedir dos veces lo mismo.
+      if (next !== null) setIsTheory(true);
+    },
+    [onUnitChange]
+  );
 
   if (variant === "mobile") {
     return (
@@ -154,6 +174,10 @@ export function JournalPrompt({
             setIsTheory={setIsTheory}
             chunks={chunks}
             bumpChunks={bumpChunks}
+            unit={unit}
+            pickingUnit={pickingUnit}
+            openUnitPicker={() => setPickingUnit(true)}
+            onUnitChange={handleUnitChange}
             onSave={handleSave}
             onClose={onClose}
           />
@@ -182,6 +206,10 @@ export function JournalPrompt({
         setIsTheory={setIsTheory}
         chunks={chunks}
         bumpChunks={bumpChunks}
+        unit={unit}
+        pickingUnit={pickingUnit}
+        openUnitPicker={() => setPickingUnit(true)}
+        onUnitChange={handleUnitChange}
         onSave={handleSave}
         onClose={onClose}
       />
@@ -230,6 +258,10 @@ interface JournalContentProps {
   setIsTheory: (fn: (prev: boolean) => boolean) => void;
   chunks: number;
   bumpChunks: (delta: number) => void;
+  unit: UnitValue | null;
+  pickingUnit: boolean;
+  openUnitPicker: () => void;
+  onUnitChange: (next: UnitValue | null) => void;
   onSave: () => void;
   onClose: () => void;
 }
@@ -251,6 +283,10 @@ function JournalContent({
   setIsTheory,
   chunks,
   bumpChunks,
+  unit,
+  pickingUnit,
+  openUnitPicker,
+  onUnitChange,
   onSave,
   onClose,
 }: JournalContentProps) {
@@ -310,50 +346,77 @@ function JournalContent({
         </div>
 
         {/*
-          Teoría por bloques — debajo de las cajas de texto. Primero se escribe
+          Medición del avance — debajo de las cajas de texto. Primero se escribe
           qué se hizo, después se declara cómo se mide: arriba, el primer campo
           del modal era una casilla que la mayoría de las sesiones deja sin
           tildar.
+
+          Y tiene DOS estados. Sin unidad configurada no hay casilla: el usuario
+          nuevo no tiene por qué encontrarse una palabra que no eligió. En su
+          lugar va una invitación discreta que abre el selector acá mismo —
+          mandarlo a Configuración justo cuando terminó de trabajar pierde la
+          intención, y esconderlo sólo allá lo vuelve invisible.
         */}
         <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={isTheory}
-              onChange={() => setIsTheory((v) => !v)}
-              className="w-4 h-4 rounded accent-[var(--color-mint)] cursor-pointer"
-            />
-            <span className="text-xs text-white/70">Estudié teoría por bloques</span>
-          </label>
-
-          {isTheory && (
-            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-              <StepperButton
-                label="Restar medio bloque"
-                onClick={() => bumpChunks(-CHUNK_STEP)}
-                disabled={chunks <= CHUNK_MIN}
-              >
-                −
-              </StepperButton>
-              <div className="flex-1 text-center">
-                <span
-                  data-testid="bloques-value"
-                  className="text-lg font-semibold text-white tabular-nums"
-                >
-                  {fmtNumber(chunks)}
-                </span>
-                <span className="text-[10px] text-white/35 ml-1.5">
-                  {chunks === 1 ? "bloque" : "bloques"}
-                </span>
+          {unit === null ? (
+            pickingUnit ? (
+              <div className="flex flex-col gap-2 bg-white/5 border border-white/10 rounded-xl p-2.5">
+                <p className="text-[11px] text-white/60">¿En qué medís tu avance?</p>
+                <UnitPicker value={null} onChange={onUnitChange} />
               </div>
-              <StepperButton
-                label="Sumar medio bloque"
-                onClick={() => bumpChunks(CHUNK_STEP)}
-                disabled={chunks >= CHUNK_MAX}
+            ) : (
+              <button
+                type="button"
+                onClick={openUnitPicker}
+                className="self-start text-[11px] text-white/30 hover:text-white/60 transition-colors"
               >
-                +
-              </StepperButton>
-            </div>
+                + Medir mi avance
+              </button>
+            )
+          ) : (
+            <>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isTheory}
+                  onChange={() => setIsTheory((v) => !v)}
+                  className="w-4 h-4 rounded accent-[var(--color-mint)] cursor-pointer"
+                />
+                <span className="text-xs text-white/70">
+                  Medí el avance en {unit.plural}
+                </span>
+              </label>
+
+              {isTheory && (
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                  <StepperButton
+                    label={`Restar medio ${unit.singular}`}
+                    onClick={() => bumpChunks(-CHUNK_STEP)}
+                    disabled={chunks <= CHUNK_MIN}
+                  >
+                    −
+                  </StepperButton>
+                  <div className="flex-1 text-center">
+                    <span
+                      data-testid="unit-value"
+                      className="text-lg font-semibold text-white tabular-nums"
+                    >
+                      {fmtNumber(chunks)}
+                    </span>
+                    <span className="text-[10px] text-white/35 ml-1.5">
+                      {chunks === 1 ? unit.singular : unit.plural}
+                    </span>
+                  </div>
+                  <StepperButton
+                    label={`Sumar medio ${unit.singular}`}
+                    onClick={() => bumpChunks(CHUNK_STEP)}
+                    disabled={chunks >= CHUNK_MAX}
+                  >
+                    +
+                  </StepperButton>
+                </div>
+              )}
+            </>
           )}
         </div>
 
