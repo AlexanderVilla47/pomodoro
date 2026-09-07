@@ -46,3 +46,64 @@ describe("SettingsPanel", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
   });
 });
+
+describe("SettingsPanel — unidad de avance", () => {
+  const conUnidad = {
+    ...DEFAULT_SETTINGS,
+    preferences: { ...DEFAULT_PREFERENCES, unitSingular: "página", unitPlural: "páginas" },
+  };
+
+  it("ofrece el selector de unidad", () => {
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "cards" })).toBeInTheDocument();
+  });
+
+  it("guarda la unidad elegida junto al resto de la configuración", async () => {
+    const onSave = vi.fn();
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={onSave} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "cards" }));
+    await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferences: expect.objectContaining({
+            unitSingular: "card",
+            unitPlural: "cards",
+          }),
+        })
+      )
+    );
+  });
+
+  it("avisa que el historial se mezcla al cambiar de unidad", async () => {
+    // Los chunks viejos eran páginas y los nuevos van a ser cards: el promedio
+    // los suma sin distinguirlos. Avisa, no impide — la decisión es del usuario.
+    render(<SettingsPanel settings={conUnidad} onSave={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "cards" }));
+    expect(screen.getByRole("status")).toHaveTextContent(/páginas/i);
+  });
+
+  it("no avisa nada cuando antes no había unidad", async () => {
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "cards" }));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("deja dejar de medir, y eso saca la casilla del journal", async () => {
+    const onSave = vi.fn();
+    render(<SettingsPanel settings={conUnidad} onSave={onSave} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /no medir/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
+
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          preferences: expect.objectContaining({ unitSingular: null, unitPlural: null }),
+        })
+      )
+    );
+  });
+});
