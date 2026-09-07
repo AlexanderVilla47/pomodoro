@@ -49,7 +49,8 @@ describe("GET /api/stats/efficiency", () => {
         label_id: 1,
         label_name: "RRHH",
         label_color: "#5ABFA8",
-        total_seconds: 3600,
+        total_seconds: 7200,
+        unit_seconds: 3600,
         total_chunks: 4,
         sessions: 2,
         distractions: 1,
@@ -59,7 +60,15 @@ describe("GET /api/stats/efficiency", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.rows).toHaveLength(1);
-    expect(body.rows[0]).toMatchObject({ day: "2026-08-17", total_chunks: 4 });
+    // `unit_seconds` viaja entero: el endpoint es un pasamanos y toda la
+    // division vive en el cliente. Si se perdiera acá, min/unidad se
+    // calcularia sobre un undefined y daria NaN sin avisar.
+    expect(body.rows[0]).toMatchObject({
+      day: "2026-08-17",
+      total_seconds: 7200,
+      unit_seconds: 3600,
+      total_chunks: 4,
+    });
   });
 
   it("sin datos devuelve una lista vacia, no un error", async () => {

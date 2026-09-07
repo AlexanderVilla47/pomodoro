@@ -28,11 +28,22 @@ interface StudyReportsProps {
 const UNIDAD_GENERICA: UnitValue = { singular: "unidad", plural: "unidades" };
 
 /**
- * Las cuatro métricas, con su dirección de mejora declarada.
+ * El nivel de una métrica, y con eso cuándo se muestra.
  *
- * La dirección no es decorativa: min/bloque mejora BAJANDO y bloques/día
+ * `always` sale de las sesiones y existe desde el primer pomodoro. `units`
+ * necesita que alguien haya cargado unidades: sin eso no vale cero, no existe.
+ */
+type Tier = "always" | "units";
+
+/**
+ * Las seis métricas, con su nivel y su dirección de mejora declarados.
+ *
+ * La dirección no es decorativa: min/unidad mejora BAJANDO y unidades/día
  * mejora SUBIENDO. Pintar de verde "todo lo que sube" marcaría como logro un
- * min/bloque que empeoró.
+ * min/unidad que empeoró.
+ *
+ * El nivel tampoco: es una columna del registro y no un `if` por métrica, así
+ * que agregar una sigue siendo agregar una entrada a este array.
  */
 const METRICS: Array<{
   id: string;
@@ -45,27 +56,23 @@ const METRICS: Array<{
   label: (u: UnitValue) => string;
   hint: string;
   direction: Direction;
+  tier: Tier;
 }> = [
   {
-    id: "minutes-per-block",
-    field: "minutesPerBlock",
-    label: (u) => `min/${u.singular}`,
-    hint: "menos es mejor",
-    direction: "lower-is-better",
-  },
-  {
-    id: "blocks-per-day",
-    field: "blocksPerDay",
-    label: (u) => `${u.plural}/día`,
+    id: "hours",
+    field: "hours",
+    label: () => "horas estudiadas",
     hint: "más es mejor",
     direction: "higher-is-better",
+    tier: "always",
   },
   {
-    id: "study-days",
-    field: "studyDays",
-    label: () => "días estudiados",
+    id: "worked-days",
+    field: "workedDays",
+    label: () => "días trabajados",
     hint: "más es mejor",
     direction: "higher-is-better",
+    tier: "always",
   },
   {
     id: "distractions-per-hour",
@@ -73,6 +80,34 @@ const METRICS: Array<{
     label: () => "cortes/hora",
     hint: "menos es mejor",
     direction: "lower-is-better",
+    tier: "always",
+  },
+  {
+    id: "minutes-per-block",
+    field: "minutesPerBlock",
+    label: (u) => `min/${u.singular}`,
+    hint: "menos es mejor",
+    direction: "lower-is-better",
+    tier: "units",
+  },
+  {
+    id: "blocks-per-day",
+    field: "blocksPerDay",
+    label: (u) => `${u.plural}/día`,
+    hint: "más es mejor",
+    direction: "higher-is-better",
+    tier: "units",
+  },
+  {
+    // "días con avance" y no "días estudiados": ahora convive con "días
+    // trabajados" y dos rótulos parecidos sobre números distintos se leen
+    // como un bug.
+    id: "study-days",
+    field: "studyDays",
+    label: () => "días con avance",
+    hint: "más es mejor",
+    direction: "higher-is-better",
+    tier: "units",
   },
 ];
 
@@ -160,6 +195,20 @@ export function StudyReports({ onBack, unit }: StudyReportsProps) {
   const current = periods.at(-1) ?? null;
   const previous = periods.at(-2) ?? null;
 
+  /**
+   * ¿Hay algo que medir en lo que se está mirando?
+   *
+   * Se pregunta sobre `periods` y no sobre `rows` a propósito: así respeta los
+   * chips de materia. Filtrar hasta quedarse sólo con materias sin unidades
+   * deja un panel coherente en vez de tres métricas en guión.
+   *
+   * Una métrica no se prende con un toggle: se calcula si hay con qué. Por eso
+   * no existe una preferencia de "mostrar métricas de ritmo".
+   */
+  const hasUnits = periods.some((p) => p.totalUnits > 0);
+
+  const visibleMetrics = METRICS.filter((m) => m.tier === "always" || hasUnits);
+
   const breakdown = useMemo(() => {
     if (!current) return [];
     return byLabel(
@@ -206,12 +255,15 @@ export function StudyReports({ onBack, unit }: StudyReportsProps) {
           </p>
         )}
 
+        {/*
+          El vacío ya no puede culpar a las unidades: el informe arranca en las
+          sesiones, así que lo único que lo deja vacío es no haber trabajado.
+        */}
         {!loading && !error && rows.length === 0 && (
           <p data-testid="reports-empty" className="text-xs text-white/30 text-center py-4 leading-relaxed">
-            Todavía no hay nada para medir.
+            Todavía no hay sesiones para medir.
             <br />
-            Los informes miran sólo las sesiones en las que cargaste{" "}
-            <span className="text-white/50">{u.plural}</span>.
+            Terminá un pomodoro y acá vas a ver tus horas, tus días y tus cortes.
           </p>
         )}
 
@@ -273,7 +325,7 @@ export function StudyReports({ onBack, unit }: StudyReportsProps) {
                   )}
                 </div>
 
-                {METRICS.map((m) => {
+                {visibleMetrics.map((m) => {
                   const value = current[m.field] as number | null;
                   const prev = previous ? (previous[m.field] as number | null) : null;
                   const delta = previous ? compare(value, prev, m.direction) : null;
@@ -302,8 +354,9 @@ export function StudyReports({ onBack, unit }: StudyReportsProps) {
               </div>
             )}
 
-            {/* Series por período */}
-            {periods.length > 1 &&
+            {/* Series por período — las dos son de unidades */}
+            {hasUnits &&
+              periods.length > 1 &&
               (["minutesPerBlock", "blocksPerDay"] as const).map((field) => {
                 const max = Math.max(...periods.map((p) => p[field] ?? 0), 1);
                 const title =
@@ -335,8 +388,8 @@ export function StudyReports({ onBack, unit }: StudyReportsProps) {
                 );
               })}
 
-            {/* Desglose por materia */}
-            {breakdown.length > 0 && (
+            {/* Desglose por materia — muestra min/unidad y nada más */}
+            {hasUnits && breakdown.length > 0 && (
               <div
                 data-testid="label-breakdown"
                 className="flex flex-col gap-2 p-3 rounded-xl bg-white/5 border border-white/10"
