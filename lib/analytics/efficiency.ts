@@ -12,20 +12,52 @@ export interface EfficiencyRow {
   label_id: number | null;
   label_name: string | null;
   label_color: string | null;
+  /** Todo el tiempo de trabajo del día, se hayan cargado unidades o no. */
   total_seconds: number;
+  /**
+   * El subconjunto de `total_seconds` que sí produjo unidades.
+   *
+   * Existe porque la query trae todas las sesiones de trabajo, no sólo las que
+   * midieron algo: dividir `total_seconds` por las unidades mezclaría tiempo
+   * que no produjo ninguna e inflaría min/unidad en silencio.
+   */
+  unit_seconds: number;
   total_chunks: number;
   sessions: number;
   distractions: number;
 }
 
+/**
+ * Las métricas de un conjunto de filas, en dos niveles.
+ *
+ * **Nivel 1 — universal.** Sale sólo de `sessions` y existe desde el primer
+ * pomodoro, sin que el usuario configure nada.
+ *
+ * **Nivel 2 — de ritmo.** Necesita unidades cargadas. No se prende con un
+ * toggle: se calcula si hay con qué, y si no queda en null. La app no pregunta
+ * si querés una métrica, mira si la puede calcular.
+ */
 export interface Summary {
-  /** Baja = vas más rápido. */
-  minutesPerBlock: number | null;
-  /** Sube = rendís más por día que te sentás a estudiar. */
-  blocksPerDay: number | null;
-  studyDays: number;
-  /** Baja = te concentrás mejor. */
+  /** Nivel 1. Horas de trabajo del período. */
+  hours: number;
+  /** Nivel 1. Días distintos con al menos una sesión de trabajo. */
+  workedDays: number;
+  /** Nivel 1. Baja = te concentrás mejor. */
   distractionsPerHour: number | null;
+  /** Nivel 2. Baja = vas más rápido. */
+  minutesPerBlock: number | null;
+  /** Nivel 2. Sube = rendís más por día con avance. */
+  blocksPerDay: number | null;
+  /** Nivel 2. Días distintos con unidades cargadas. */
+  studyDays: number;
+  /**
+   * Nivel 2. Unidades del período.
+   *
+   * Es lo que le deja preguntar a la UI "¿esta persona mide algo?" con una
+   * comparación y no adivinando desde un `null`, que también significa "no
+   * alcanza la muestra".
+   */
+  totalUnits: number;
 }
 
 export type Granularity = "week" | "month";
@@ -77,30 +109,39 @@ function totals(rows: EfficiencyRow[]) {
   return rows.reduce(
     (acc, r) => ({
       seconds: acc.seconds + r.total_seconds,
+      unitSeconds: acc.unitSeconds + r.unit_seconds,
       chunks: acc.chunks + r.total_chunks,
       distractions: acc.distractions + r.distractions,
     }),
-    { seconds: 0, chunks: 0, distractions: 0 }
+    { seconds: 0, unitSeconds: 0, chunks: 0, distractions: 0 }
   );
 }
 
 /**
- * Min/bloque de un conjunto de filas: suma todo primero y divide una sola vez.
+ * Min/unidad de un conjunto de filas: suma todo primero y divide una sola vez.
  *
- * El orden importa. Promediar los min/bloque de cada día le da el mismo peso a
- * un día de 10 bloques que a uno de 1, y un día corto termina moviendo el
+ * El orden importa. Promediar los min/unidad de cada día le da el mismo peso a
+ * un día de 10 unidades que a uno de 1, y un día corto termina moviendo el
  * número del período entero.
+ *
+ * Divide por `unitSeconds` y **no** por `seconds`: desde que la query trae
+ * también las sesiones sin unidades, el tiempo total incluye trabajo que no
+ * produjo ninguna. Usarlo daría un número más alto, plausible y equivocado.
  */
 export function weightedAverage(rows: EfficiencyRow[]): number | null {
-  const { seconds, chunks } = totals(rows);
-  return minutesPerChunk(seconds, chunks);
+  const { unitSeconds, chunks } = totals(rows);
+  return minutesPerChunk(unitSeconds, chunks);
 }
 
 /**
- * Días distintos en los que hubo estudio con bloques cargados.
+ * Días distintos con unidades cargadas — "días con avance" en la UI.
  *
  * Deduplica por fecha: la query devuelve una fila por día + materia, así que
  * estudiar dos materias el mismo día son dos filas y un solo día.
+ *
+ * No confundir con `workedDays`, que cuenta los días que te sentaste midieras o
+ * no. Convivir en el mismo panel es la razón por la que dejó de llamarse "días
+ * estudiados": los dos rótulos eran indistinguibles.
  */
 export function studyDays(rows: EfficiencyRow[]): number {
   const days = new Set<string>();
@@ -122,6 +163,28 @@ export function blocksPerStudyDay(rows: EfficiencyRow[]): number | null {
   const days = studyDays(rows);
   if (days === 0) return null;
   return round1(totals(rows).chunks / days);
+}
+
+/**
+ * Horas de trabajo del período. La métrica más obvia de todas, y hasta ahora
+ * los informes no la mostraban: vivía detrás del filtro de unidades.
+ *
+ * Devuelve 0 y no null con una serie vacía: cero horas es un dato cierto, no un
+ * dato que falta.
+ */
+export function hoursStudied(rows: EfficiencyRow[]): number {
+  return round1(totals(rows).seconds / 3600);
+}
+
+/**
+ * Días distintos con al menos una sesión de trabajo, mida unidades o no.
+ *
+ * Deduplica por fecha igual que `studyDays`, porque la query devuelve una fila
+ * por día + materia. Toda fila que llega acá es un día en que hubo trabajo: la
+ * query ya filtró por `type = 'work'`.
+ */
+export function workedDays(rows: EfficiencyRow[]): number {
+  return new Set(rows.map((r) => r.day)).size;
 }
 
 /**
@@ -148,6 +211,10 @@ export const MIN_SECONDS_FOR_RATE = 15 * 60;
  *
  * Es del período completo, no de cada sesión: tres sesiones de 6 minutos suman
  * 18 y sí se muestran.
+ *
+ * El denominador es TODO el tiempo trabajado, no sólo el que produjo unidades:
+ * los cortes se normalizan contra el tiempo real. Usar `unitSeconds` inflaría
+ * la tasa justo de quien mide poco.
  */
 export function distractionsPerHour(rows: EfficiencyRow[]): number | null {
   const { seconds, distractions } = totals(rows);
@@ -157,10 +224,13 @@ export function distractionsPerHour(rows: EfficiencyRow[]): number | null {
 
 export function summarize(rows: EfficiencyRow[]): Summary {
   return {
+    hours: hoursStudied(rows),
+    workedDays: workedDays(rows),
+    distractionsPerHour: distractionsPerHour(rows),
     minutesPerBlock: weightedAverage(rows),
     blocksPerDay: blocksPerStudyDay(rows),
     studyDays: studyDays(rows),
-    distractionsPerHour: distractionsPerHour(rows),
+    totalUnits: totals(rows).chunks,
   };
 }
 
