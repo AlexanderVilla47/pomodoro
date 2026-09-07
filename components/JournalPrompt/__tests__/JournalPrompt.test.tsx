@@ -5,15 +5,20 @@ import { JournalPrompt } from "../index";
 const mockSave = vi.fn();
 const mockClose = vi.fn();
 const mockSaved = vi.fn();
+const mockUnitChange = vi.fn();
+
+const BLOQUE = { singular: "bloque", plural: "bloques" };
 
 function setup(
   sessionClientId: string | null = "uuid-1",
-  variant: "mobile" | "desktop" = "desktop"
+  opts: { variant?: "mobile" | "desktop"; unit?: { singular: string; plural: string } | null } = {}
 ) {
   return render(
     <JournalPrompt
       sessionClientId={sessionClientId}
-      variant={variant}
+      variant={opts.variant ?? "desktop"}
+      unit={opts.unit ?? null}
+      onUnitChange={mockUnitChange}
       onClose={mockClose}
       onSaved={mockSaved}
       saveWorkLog={mockSave}
@@ -80,17 +85,56 @@ describe("JournalPrompt", () => {
   });
 });
 
-describe("JournalPrompt — bloques de teoría", () => {
-  const theoryCheckbox = () => screen.getByLabelText(/Estudié teoría por bloques/i);
+describe("JournalPrompt — sin unidad configurada", () => {
+  it("no muestra ninguna casilla de medición", () => {
+    // El caso del usuario nuevo. "bloque" es media página del apunte de una
+    // persona: encontrárselo en pantalla sin haberlo elegido no significa nada.
+    setup();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/bloque/i);
+  });
+
+  it("ofrece configurarla con una línea discreta", () => {
+    setup();
+    expect(screen.getByRole("button", { name: /medir mi avance/i })).toBeInTheDocument();
+  });
+
+  it("el selector se abre ADENTRO del modal, sin mandar a Configuración", async () => {
+    // El momento en que a alguien se le ocurre medir su avance es justo cuando
+    // terminó de trabajar. Mandarlo a otra pantalla ahí pierde la intención.
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /medir mi avance/i }));
+    expect(screen.getByRole("button", { name: "cards" })).toBeInTheDocument();
+  });
+
+  it("elegir una unidad la reporta hacia arriba", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /medir mi avance/i }));
+    fireEvent.click(screen.getByRole("button", { name: "cards" }));
+    expect(mockUnitChange).toHaveBeenCalledWith({ singular: "card", plural: "cards" });
+  });
+
+  it("guarda sin unidad como una sesión que no midió nada", async () => {
+    setup("uuid-9");
+    fireEvent.click(screen.getByText("Guardar"));
+    await waitFor(() =>
+      expect(mockSave).toHaveBeenCalledWith(
+        expect.objectContaining({ isTheory: false, chunks: null })
+      )
+    );
+  });
+});
+
+describe("JournalPrompt — con unidad configurada", () => {
+  const theoryCheckbox = () => screen.getByLabelText(/Medí el avance en bloques/i);
   const plus = () => screen.getByLabelText("Sumar medio bloque");
   const minus = () => screen.getByLabelText("Restar medio bloque");
 
   it("no dice chunk en ningún lado", () => {
-    // La unidad se llama bloque en toda la UI. El rename del plan 003 se hizo
-    // en los informes y se olvidó de este modal, que es justo donde el dato
-    // se carga.
-    setup();
-    fireEvent.click(screen.getByLabelText(/Estudié teoría por bloques/i));
+    // La unidad se llama como el usuario la llamó. "chunk" es el nombre de la
+    // columna y no tiene por qué salir nunca a la superficie.
+    setup("uuid-1", { unit: BLOQUE });
+    fireEvent.click(theoryCheckbox());
     expect(document.body.textContent).not.toMatch(/chunk/i);
     expect(document.body.innerHTML).not.toMatch(/chunk/i);
   });
@@ -99,42 +143,42 @@ describe("JournalPrompt — bloques de teoría", () => {
     // Primero se escribe qué se hizo, después se declara cómo se mide. Al
     // revés, el primer campo del modal es una casilla que la mayoría de las
     // sesiones deja sin tildar.
-    setup();
+    setup("uuid-1", { unit: BLOQUE });
     const textarea = screen.getByPlaceholderText(/Descripción/i);
-    const checkbox = screen.getByLabelText(/Estudié teoría por bloques/i);
+    const checkbox = theoryCheckbox();
     const posicion = textarea.compareDocumentPosition(checkbox);
     expect(posicion & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("el stepper está oculto mientras el checkbox esté destildado", () => {
-    setup();
+    setup("uuid-1", { unit: BLOQUE });
     expect(screen.queryByLabelText("Sumar medio bloque")).not.toBeInTheDocument();
   });
 
   it("al tildar el checkbox aparece el stepper arrancando en 1", () => {
-    setup();
+    setup("uuid-1", { unit: BLOQUE });
     fireEvent.click(theoryCheckbox());
-    expect(screen.getByTestId("bloques-value")).toHaveTextContent("1");
+    expect(screen.getByTestId("unit-value")).toHaveTextContent("1");
   });
 
   it("el + suma de a medio bloque", () => {
-    setup();
+    setup("uuid-1", { unit: BLOQUE });
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
-    expect(screen.getByTestId("bloques-value")).toHaveTextContent("1,5");
+    expect(screen.getByTestId("unit-value")).toHaveTextContent("1,5");
   });
 
   it("el − resta de a medio bloque y no baja de 0,5", () => {
-    setup();
+    setup("uuid-1", { unit: BLOQUE });
     fireEvent.click(theoryCheckbox());
     fireEvent.click(minus());
-    expect(screen.getByTestId("bloques-value")).toHaveTextContent("0,5");
+    expect(screen.getByTestId("unit-value")).toHaveTextContent("0,5");
     fireEvent.click(minus());
-    expect(screen.getByTestId("bloques-value")).toHaveTextContent("0,5");
+    expect(screen.getByTestId("unit-value")).toHaveTextContent("0,5");
   });
 
   it("guarda isTheory con la cantidad de bloques elegida", async () => {
-    setup("uuid-7");
+    setup("uuid-7", { unit: BLOQUE });
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
     fireEvent.click(plus());
@@ -152,7 +196,7 @@ describe("JournalPrompt — bloques de teoría", () => {
   });
 
   it("destildar el checkbox descarta los bloques acumulados", async () => {
-    setup("uuid-7");
+    setup("uuid-7", { unit: BLOQUE });
     fireEvent.click(theoryCheckbox());
     fireEvent.click(plus());
     fireEvent.click(theoryCheckbox());
@@ -166,3 +210,29 @@ describe("JournalPrompt — bloques de teoría", () => {
   });
 });
 
+
+describe("JournalPrompt — el rótulo es el que eligió el usuario", () => {
+  const CARD = { singular: "card", plural: "cards" };
+
+  it("la casilla habla de su unidad, no de bloques ni de teoría", () => {
+    setup("uuid-1", { unit: CARD });
+    expect(screen.getByLabelText(/Medí el avance en cards/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/bloque|teoría/i);
+  });
+
+  it("el stepper usa singular y plural según la cantidad", () => {
+    setup("uuid-1", { unit: CARD });
+    fireEvent.click(screen.getByLabelText(/Medí el avance en cards/i));
+
+    expect(screen.getByText("card")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Sumar medio card"));
+    expect(screen.getByText("cards")).toBeInTheDocument();
+  });
+
+  it("los aria-label del stepper acompañan a la unidad", () => {
+    setup("uuid-1", { unit: CARD });
+    fireEvent.click(screen.getByLabelText(/Medí el avance en cards/i));
+    expect(screen.getByLabelText("Sumar medio card")).toBeInTheDocument();
+    expect(screen.getByLabelText("Restar medio card")).toBeInTheDocument();
+  });
+});
