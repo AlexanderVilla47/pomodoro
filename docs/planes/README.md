@@ -12,6 +12,7 @@ marca completado. Nada se pierde entre sesiones.
 | [002](002-client-id.md) | `client_id`: offline real + arreglo de duplicados | ✅ Completado — 2026-09-01, PR #23 |
 | [003](003-informes-progreso.md) | Informes de progreso de estudio | ✅ Completado — 2026-09-01, PR #24 |
 | [004](004-ajustes-informes.md) | Ajustes a los informes: el silencio y los números absurdos | ✅ Completado — 2026-09-02, PR #27 |
+| [005](005-preferencias-usuario.md) | Desacoplar Pomy de su autor: unidad configurable, informes universales y preferencias | ⬜ Pendiente |
 
 ## Cómo se usa
 
