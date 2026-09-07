@@ -1,6 +1,6 @@
 # 005 — Desacoplar Pomy de su autor: unidad configurable, informes universales y preferencias
 
-**Estado:** 🔨 En progreso — PRs 1, 2 y 3 ✅ mergeados; **falta el 4**
+**Estado:** ✅ Completado — 2026-09-07, PRs #31, #32, #34 y #35
 **Depende de:** [001 — Chunks de estudio](001-chunks-estudio.md), [003 — Informes de progreso](003-informes-progreso.md) y [004 — Ajustes a los informes](004-ajustes-informes.md) — ✅ los tres están
 
 ## Por qué
@@ -193,26 +193,23 @@ porque el 1 habilita a los demás:
 | 1 | `feat/preferencias-capa` | Migración + módulo puro + API | No | ✅ PR #31 |
 | 2 | `feat/unidad-configurable` | **D** — la unidad en la UI | Sí | ✅ PR #32 |
 | 3 | `feat/informes-sin-bloques` | **E** — informes universales | Sí | ✅ PR #34 |
-| 4 | `feat/preferencias-journal-social` | **C** — los dos toggles | Sí | 🔨 En progreso |
+| 4 | `feat/preferencias-journal-social` | **C** — los dos toggles | Sí | ✅ PR #35 |
 
-> ### 📍 Dónde retomar
+> ### 📍 Estado final
 >
-> **Queda sólo el PR 4, los dos toggles.** Los PRs 1, 2 y 3 están en
-> producción y el sistema quedó consistente: se elige la unidad, los rótulos la
-> respetan en todos lados, y los informes ya sirven sin haber cargado una sola.
+> **Los cuatro PRs están en producción.** Pomy dejó de estar construido para
+> una sola persona:
 >
-> **El bug que motivó el plan está arreglado.** `getStudyEfficiencyByDay`
-> arranca en `sessions` y quien nunca mide unidades ve horas, días trabajados y
-> cortes/hora. Lo que falta es lo único que ningún dato puede contestar: si
-> querés que te pregunten después de cada pomodoro, y si querés estar visible
-> para tus amigos.
+> - la unidad de avance la elige cada uno, y si no elige ninguna la app no le
+>   pregunta por bloques que no existen
+> - los informes sirven desde el primer pomodoro, midas o no midas algo
+> - el journal y lo social se pueden apagar
 >
-> Arrancar por la sección **"PR 4 — C: los dos toggles"** y por la regla que la
-> ordena: *si el dato ya responde la pregunta, no hagas un setting; si es
-> intrusivo o es privacidad, no lo infieras: preguntá.*
->
-> ⚠️ **La decisión incómoda del PR 4 está escrita en su sección**: `social`
-> arranca en `true`, y el porqué importa más que el valor.
+> **Queda una deuda anotada, no olvidada**: `social` arranca en `true` porque
+> el default se aplica a toda fila con `preferences = '{}'` y cambiarlo hoy
+> desconectaría de golpe a los que ya tienen amigos. Cuando exista un
+> onboarding que pregunte, pasa a `false` y el onboarding se encarga de los que
+> ya están. Está escrito también en `DEFAULT_PREFERENCES`.
 
 El PR 4 (**C**) no depende de los anteriores: son toggles de montaje y podrían
 haberse hecho primero. Van al final porque son lo menos urgente — nadie está
@@ -776,6 +773,27 @@ que no explica qué comparte no es un consentimiento.
    - `social: false` con el tab en `friends` → cae a `timer`
 2. `SettingsPanel.test.tsx`: destildar manda `preferences: { journal: false }` y
    **no** pisa `unitSingular` (el merge del PR 1, verificado de punta a punta)
+
+---
+
+### Lo que apareció al implementarlo
+
+**Los tabs se derivan, no se sincronizan con un efecto.** La solución obvia al
+"si el tab activo era Amigos, caer a otro" es un `useEffect` que corrija el
+estado. Renderiza una vez con el panel viejo desmontado y el reemplazo todavía
+sin montar: el parpadeo en blanco que se quería evitar. Se derivan
+`mobileTabVisible` y `desktopTabVisible` en el mismo render y el estado queda
+intacto — volver a prender lo social te devuelve al tab donde estabas.
+
+**Dos de los tests que pedía el plan quedaron afuera, a propósito.** "No se
+guarda la fila vacía del journal" y "no se pega a `/api/presence`" no pueden
+ponerse rojos nunca: el trabajo lo hacen `JournalPrompt` y `PresenceHeartbeat`,
+que en ese test están stubeados. Un test que no puede fallar no es cobertura,
+es confianza falsa. El razonamiento vive como comentario en `HomeClient.tsx`.
+
+**El `TimerProvider` stubeado tiene que guardar su `onSessionLogged`.** Sin eso,
+"al terminar un pomodoro no aparece la pregunta" pasa en verde sin haber
+terminado ningún pomodoro: el timer está mockeado y la sesión nunca termina.
 
 ---
 
