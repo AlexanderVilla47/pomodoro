@@ -32,7 +32,14 @@ const DEFAULT_SETTINGS = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGet.mockResolvedValue(DEFAULT_SETTINGS);
-  mockUpsert.mockImplementation(async (_db, _userId, patch) => ({ ...DEFAULT_SETTINGS, ...patch }));
+  // El patch es PARCIAL, incluidas las preferencias: mergearlas acá replica lo
+  // que hace upsertSettings de verdad. Spreadear el patch sobre el fixture
+  // dejaría `preferences` a medias.
+  mockUpsert.mockImplementation(async (_db, _userId, patch) => ({
+    ...DEFAULT_SETTINGS,
+    ...patch,
+    preferences: { ...DEFAULT_PREFERENCES, ...(patch.preferences ?? {}) },
+  }));
 });
 
 describe("GET /api/settings", () => {

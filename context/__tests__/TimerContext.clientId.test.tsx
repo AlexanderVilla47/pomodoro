@@ -3,6 +3,7 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TimerProvider } from "../TimerContext";
 import { useTimer } from "@/hooks/useTimer";
+import { DEFAULT_PREFERENCES } from "@/lib/preferences";
 
 vi.mock("gsap", () => ({
   default: {
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS = {
   long_break_duration: 900,
   long_break_interval: 4,
   notification_sound_enabled: false,
+  preferences: DEFAULT_PREFERENCES,
 };
 
 const LS_CLIENT_ID_KEY = "pomodoro_session_client_id";

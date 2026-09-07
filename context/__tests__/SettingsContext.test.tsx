@@ -3,6 +3,7 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsProvider } from "../SettingsContext";
 import { useSettings } from "@/hooks/useSettings";
+import { DEFAULT_PREFERENCES } from "@/lib/preferences";
 
 const DEFAULT_SETTINGS = {
   id: 1,
@@ -11,6 +12,7 @@ const DEFAULT_SETTINGS = {
   long_break_duration: 900,
   long_break_interval: 4,
   notification_sound_enabled: true,
+  preferences: DEFAULT_PREFERENCES,
 };
 
 function TestConsumer() {
