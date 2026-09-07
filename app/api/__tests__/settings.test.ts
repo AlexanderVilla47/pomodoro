@@ -14,6 +14,7 @@ vi.mock("@/lib/auth/session", () => ({
 
 import { GET, PUT } from "../settings/route";
 import { getSettings, upsertSettings } from "@/lib/db/queries/settings";
+import { DEFAULT_PREFERENCES } from "@/lib/preferences";
 
 const mockGet = vi.mocked(getSettings);
 const mockUpsert = vi.mocked(upsertSettings);
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS = {
   long_break_duration: 900,
   long_break_interval: 4,
   notification_sound_enabled: true,
+  preferences: DEFAULT_PREFERENCES,
 };
 
 beforeEach(() => {
@@ -43,6 +45,13 @@ describe("GET /api/settings", () => {
     expect(body.long_break_duration).toBe(900);
     expect(body.long_break_interval).toBe(4);
     expect(body.notification_sound_enabled).toBe(true);
+  });
+
+  it("retorna las preferencias ya resueltas, sin unidad configurada", async () => {
+    const res = await GET();
+    const body = await res.json();
+    expect(body.preferences).toEqual(DEFAULT_PREFERENCES);
+    expect(body.preferences.unitSingular).toBeNull();
   });
 });
 
@@ -92,5 +101,41 @@ describe("PUT /api/settings", () => {
     });
     const res = await PUT(req);
     expect(res.status).toBe(400);
+  });
+
+  /**
+   * Acá un 400 SÍ es seguro, y es la diferencia con /api/work-logs.
+   *
+   * SettingsContext hace un fetch directo y evalúa `res.ok`: no hay cola, no
+   * hay reintento, un error se descarta. useWorkLogger, en cambio, sólo da por
+   * entregado un item con 201 o 409 y reencola todo lo demás para siempre —
+   * ahí un 400 es una poison pill. Son contratos opuestos.
+   */
+  it.each([["un string", "no-soy-objeto"], ["un array", []], ["un número", 42], ["null", null]])(
+    "retorna 400 si preferences es %s",
+    async (_desc, preferences) => {
+      const req = new Request("http://localhost/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences }),
+      });
+      const res = await PUT(req);
+      expect(res.status).toBe(400);
+    }
+  );
+
+  it("pasa las preferencias parciales al upsert sin tocarlas", async () => {
+    // La normalización es del resolver, no de la ruta: acá sólo se corta lo
+    // que ni siquiera tiene la forma de un objeto de preferencias.
+    const req = new Request("http://localhost/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preferences: { journal: false } }),
+    });
+    const res = await PUT(req);
+    expect(res.status).toBe(200);
+    expect(mockUpsert).toHaveBeenCalledWith(expect.anything(), "test-user-id", {
+      preferences: { journal: false },
+    });
   });
 });
