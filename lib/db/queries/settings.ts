@@ -1,4 +1,8 @@
 import type postgres from "postgres";
+import {
+  resolvePreferences,
+  type Preferences,
+} from "@/lib/preferences";
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -9,9 +13,18 @@ export interface Settings {
   long_break_duration: number;
   long_break_interval: number;
   notification_sound_enabled: boolean;
+  /**
+   * Ya resueltas: completas, con los defaults de código aplicados. Ningún
+   * consumidor ve JSONB crudo ni tiene que decidir qué hacer con un campo
+   * faltante — misma traducción que ya hacía `notification_sound_enabled`.
+   */
+  preferences: Preferences;
 }
 
-type SettingsPatch = Partial<Omit<Settings, "id">>;
+type SettingsPatch = Partial<Omit<Settings, "id" | "preferences">> & {
+  /** Parcial: se MERGEA sobre lo guardado, nunca lo reemplaza. */
+  preferences?: Partial<Preferences>;
+};
 
 type RawRow = {
   id: number;
@@ -20,6 +33,7 @@ type RawRow = {
   long_break_duration: number;
   long_break_interval: number;
   notification_sound_enabled: number;
+  preferences: unknown;
 };
 
 export async function getSettings(sql: Sql, userId: string): Promise<Settings> {
@@ -28,11 +42,20 @@ export async function getSettings(sql: Sql, userId: string): Promise<Settings> {
   return {
     ...row,
     notification_sound_enabled: row.notification_sound_enabled === 1,
+    preferences: resolvePreferences(row.preferences),
   };
 }
 
 export async function upsertSettings(sql: Sql, userId: string, patch: SettingsPatch): Promise<Settings> {
   const current = await getSettings(sql, userId);
+
+  // ⚠️ MERGE, no reemplazo. Si esto pisara el objeto entero, apagar el journal
+  // borraría la unidad configurada. Es superficial porque la forma es plana: si
+  // algún día se anida, este comentario deja de ser cierto.
+  const nextPreferences = resolvePreferences({
+    ...current.preferences,
+    ...(patch.preferences ?? {}),
+  });
 
   const next = {
     work_duration: patch.work_duration ?? current.work_duration,
@@ -56,6 +79,7 @@ export async function upsertSettings(sql: Sql, userId: string, patch: SettingsPa
       long_break_duration = ${next.long_break_duration},
       long_break_interval = ${next.long_break_interval},
       notification_sound_enabled = ${next.notification_sound_enabled},
+      preferences = ${JSON.stringify(nextPreferences)}::jsonb,
       updated_at = NOW()
     WHERE user_id = ${userId}
   `;
@@ -64,5 +88,6 @@ export async function upsertSettings(sql: Sql, userId: string, patch: SettingsPa
     id: current.id,
     ...next,
     notification_sound_enabled: next.notification_sound_enabled === 1,
+    preferences: nextPreferences,
   };
 }
