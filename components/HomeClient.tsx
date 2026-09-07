@@ -65,6 +65,22 @@ export function HomeClient() {
 
   const { saveWorkLog } = useWorkLogger();
 
+  /**
+   * Los tabs que se muestran de verdad.
+   *
+   * Se DERIVAN en vez de sincronizarse con un efecto. Un `useEffect` que
+   * corrigiera el tab renderizaría una vez con el panel de Amigos ya
+   * desmontado y el reemplazo todavía sin montar: un parpadeo en blanco, que
+   * es exactamente lo que hay que evitar.
+   *
+   * El estado se deja intacto a propósito: si vuelve a prender lo social en la
+   * misma sesión, vuelve al tab donde estaba.
+   */
+  const mobileTabVisible: MobileTab =
+    !preferences.social && mobileTab === "friends" ? "timer" : mobileTab;
+  const desktopTabVisible: DesktopRightTab =
+    !preferences.social && desktopRightTab === "friends" ? "stats" : desktopRightTab;
+
   const unit: UnitValue | null =
     preferences.unitSingular && preferences.unitPlural
       ? { singular: preferences.unitSingular, plural: preferences.unitPlural }
@@ -102,26 +118,36 @@ export function HomeClient() {
     } catch {}
   }, []);
 
-  const handleSessionComplete = useCallback((sessionClientId: string | null) => {
-    setStatsVersion((v) => v + 1);
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 1200);
-    // Llega con el id que puso el cliente, sin esperar al servidor: por eso el
-    // prompt ahora abre igual sin internet.
-    if (sessionClientId !== null) setPendingClientId(sessionClientId);
+  const handleSessionComplete = useCallback(
+    (sessionClientId: string | null) => {
+      setStatsVersion((v) => v + 1);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 1200);
+      // Llega con el id que puso el cliente, sin esperar al servidor: por eso el
+      // prompt ahora abre igual sin internet.
+      if (preferences.journal && sessionClientId !== null) {
+        setPendingClientId(sessionClientId);
+      }
 
-    // Revela quiénes te alentaron durante la sesión (y los marca como vistos).
-    fetch("/api/cheers/reveal", { method: "POST" })
-      .then((r) => r.json())
-      .then((data: { names: string[]; count: number }) => {
-        if (data.count > 0) {
-          setCheerReveal(data);
-          window.dispatchEvent(new Event("cheers-seen"));
-          setTimeout(() => setCheerReveal(null), 6000);
-        }
-      })
-      .catch(() => {});
-  }, []);
+      // Revela quiénes te alentaron durante la sesión (y los marca como vistos).
+      //
+      // Es el único fetch social que NO vive adentro de un componente, así que
+      // no montar `PresenceHeartbeat` ni `CheerPulse` no alcanza para apagarlo:
+      // necesita su propia condición.
+      if (!preferences.social) return;
+      fetch("/api/cheers/reveal", { method: "POST" })
+        .then((r) => r.json())
+        .then((data: { names: string[]; count: number }) => {
+          if (data.count > 0) {
+            setCheerReveal(data);
+            window.dispatchEvent(new Event("cheers-seen"));
+            setTimeout(() => setCheerReveal(null), 6000);
+          }
+        })
+        .catch(() => {});
+    },
+    [preferences.journal, preferences.social]
+  );
 
   const handleJournalClose = useCallback(() => {
     if (pendingClientId !== null) {
@@ -178,13 +204,20 @@ export function HomeClient() {
       selectedLabelId={selectedLabel?.id ?? null}
     >
       {/* Auto-dismiss journal prompt when a new work session starts */}
-      <JournalBridge onWorkStart={handleJournalClose} />
+      {preferences.journal && <JournalBridge onWorkStart={handleJournalClose} />}
 
-      {/* Reporta presencia (trabajando/descanso/en línea) al servidor */}
-      <PresenceHeartbeat />
-
-      {/* Pulso en vivo anónimo de alientos recibidos */}
-      <CheerPulse />
+      {/*
+        Presencia y alientos. Apagarlos es no montarlos, y con eso alcanza:
+        `getFriends` resuelve 'offline' cuando `updated_at` quedó más viejo que
+        120 segundos, así que dejar de mandar el heartbeat te apaga solo en dos
+        minutos. Un DELETE /api/presence sería un endpoint que nadie necesita.
+      */}
+      {preferences.social && (
+        <>
+          <PresenceHeartbeat />
+          <CheerPulse />
+        </>
+      )}
 
       {/* Reveal de nombres al terminar la sesión (reemplaza al pulso) */}
       {cheerReveal && (
@@ -249,7 +282,7 @@ export function HomeClient() {
               <PomodoroTimer labelColor={selectedLabel?.color} />
 
               {/* Journal overlay sobre el timer */}
-              {pendingClientId !== null && (
+              {preferences.journal && pendingClientId !== null && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 backdrop-blur-md rounded-2xl">
                   <div className="w-full max-w-sm mx-4">
                     <JournalPrompt
@@ -283,31 +316,33 @@ export function HomeClient() {
                 <div className="shrink-0 flex gap-1 p-1 bg-white/5 rounded-xl">
                   <button
                     onClick={() => setDesktopRightTab("stats")}
-                    className={tabCls(desktopRightTab === "stats")}
+                    className={tabCls(desktopTabVisible === "stats")}
                   >
                     Estadísticas
                   </button>
                   <button
                     onClick={() => setDesktopRightTab("history")}
-                    className={tabCls(desktopRightTab === "history")}
+                    className={tabCls(desktopTabVisible === "history")}
                   >
                     Historial
                   </button>
-                  <button
-                    onClick={() => setDesktopRightTab("friends")}
-                    className={tabCls(desktopRightTab === "friends")}
-                  >
-                    Amigos
-                  </button>
+                  {preferences.social && (
+                    <button
+                      onClick={() => setDesktopRightTab("friends")}
+                      className={tabCls(desktopTabVisible === "friends")}
+                    >
+                      Amigos
+                    </button>
+                  )}
                 </div>
                 <div className="flex-1 min-h-0 overflow-hidden">
-                  {desktopRightTab === "stats" ? (
+                  {desktopTabVisible === "stats" ? (
                     <Dashboard
                       refreshTrigger={statsVersion}
                       unit={unit}
                       onViewChange={setDesktopDashboardView}
                     />
-                  ) : desktopRightTab === "history" ? (
+                  ) : desktopTabVisible === "history" ? (
                     <Historial refreshTrigger={historyVersion} />
                   ) : (
                     <FriendsPanel />
@@ -370,15 +405,15 @@ export function HomeClient() {
           <div className="flex-1 min-h-0 overflow-hidden relative">
             <Confetti trigger={showConfetti} />
 
-            <div className={`absolute inset-0 flex flex-col items-center justify-center px-6 transition-opacity duration-150 ${mobileTab === "timer" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            <div className={`absolute inset-0 flex flex-col items-center justify-center px-6 transition-opacity duration-150 ${mobileTabVisible === "timer" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <PomodoroTimer labelColor={selectedLabel?.color} />
             </div>
 
-            <div className={`absolute inset-0 p-3 transition-opacity duration-150 ${mobileTab === "music" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            <div className={`absolute inset-0 p-3 transition-opacity duration-150 ${mobileTabVisible === "music" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <MusicPanel />
             </div>
 
-            <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTab === "history" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            <div className={`absolute inset-0 overflow-y-auto p-4 flex flex-col gap-3 transition-opacity duration-150 ${mobileTabVisible === "history" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               {mobileHistorialView === "calendar" && (
                 <div className={mobileDashboardView === "analysis" ? "flex-1 min-h-0" : ""}>
                   <Dashboard
@@ -402,9 +437,11 @@ export function HomeClient() {
               )}
             </div>
 
-            <div className={`absolute inset-0 overflow-y-auto p-4 transition-opacity duration-150 ${mobileTab === "friends" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-              <FriendsPanel />
-            </div>
+            {preferences.social && (
+              <div className={`absolute inset-0 overflow-y-auto p-4 transition-opacity duration-150 ${mobileTabVisible === "friends" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                <FriendsPanel />
+              </div>
+            )}
           </div>
 
           {/* Tab bar */}
@@ -458,21 +495,24 @@ export function HomeClient() {
                   ),
                 },
               ] as const
-            ).map(({ tab, icon, label }) => (
+            )
+              .filter(({ tab }) => tab !== "friends" || preferences.social)
+              .map(({ tab, icon, label }) => (
               <button
                 key={tab}
                 onClick={() => setMobileTab(tab)}
                 className={`flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-                  mobileTab === tab ? "text-mint" : "text-white/30 hover:text-white/60"
+                  mobileTabVisible === tab ? "text-mint" : "text-white/30 hover:text-white/60"
                 }`}
               >
                 {icon}
                 {label}
               </button>
-            ))}
+              ))}
           </div>
 
           {/* Mobile journal prompt — fixed overlay, outside tab panels */}
+          {preferences.journal && (
           <JournalPrompt
             sessionClientId={pendingClientId}
             unit={unit}
@@ -482,6 +522,7 @@ export function HomeClient() {
             onSaved={handleJournalSaved}
             saveWorkLog={saveWorkLog}
           />
+          )}
 
         </div>
 
