@@ -37,6 +37,22 @@ export async function PUT(req: Request) {
     }
   }
 
+  // Sólo se corta lo que ni siquiera tiene la FORMA de un objeto de
+  // preferencias; normalizar el contenido es tarea de `resolvePreferences`, que
+  // corre igual al leer y al escribir.
+  //
+  // Acá un 400 es seguro, y es la diferencia con /api/work-logs:
+  // SettingsContext hace un fetch directo y evalúa `res.ok` — no hay cola ni
+  // reintento. useWorkLogger sólo da por entregado un item con 201 o 409 y
+  // reencola todo lo demás para siempre, así que allá un 400 sería una poison
+  // pill que no se va nunca. Son contratos opuestos.
+  if ("preferences" in body) {
+    const prefs = body.preferences;
+    if (typeof prefs !== "object" || prefs === null || Array.isArray(prefs)) {
+      return Response.json({ error: "preferences must be an object" }, { status: 400 });
+    }
+  }
+
   const db = getDb();
   const updated = await upsertSettings(db, session.user.id, body as Parameters<typeof upsertSettings>[2]);
   return Response.json(updated);
