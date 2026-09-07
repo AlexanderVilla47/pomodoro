@@ -27,6 +27,12 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
       : null;
   const [unit, setUnit] = useState<UnitValue | null>(unidadGuardada);
 
+  // Arrancan de lo guardado y no de los defaults: `settings.preferences` ya
+  // viene resuelto desde `getSettings`, así que acá nunca hay un undefined que
+  // desambiguar.
+  const [journal, setJournal] = useState(settings.preferences.journal);
+  const [social, setSocial] = useState(settings.preferences.social);
+
   // Los chunks viejos se cargaron en la unidad anterior y el promedio los suma
   // sin distinguirlos. Avisa, no impide: es información del usuario y la
   // decisión es suya. Guardar la unidad en cada work_log sería exacto, y es una
@@ -71,6 +77,8 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
         ...settings.preferences,
         unitSingular: unit?.singular ?? null,
         unitPlural: unit?.plural ?? null,
+        journal,
+        social,
       },
     });
 
@@ -164,6 +172,37 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
         />
         <span className="text-sm text-white/60">Sonido de notificación</span>
       </label>
+
+      <div className="flex flex-col gap-2 pt-1 border-t border-white/5">
+        <p className="text-xs text-white/50">Qué querés usar</p>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={journal}
+            onChange={(e) => setJournal(e.target.checked)}
+            className="w-4 h-4 accent-mint mt-0.5 shrink-0"
+          />
+          <span className="text-sm text-white/60 leading-snug">
+            Preguntarme en qué trabajé al terminar cada pomodoro
+          </span>
+        </label>
+        {/*
+          El rótulo dice qué implica y no sólo cómo se llama. Un toggle de
+          privacidad que no explica qué comparte no es un consentimiento: es
+          una palabra que el usuario tiene que adivinar.
+        */}
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={social}
+            onChange={(e) => setSocial(e.target.checked)}
+            className="w-4 h-4 accent-mint mt-0.5 shrink-0"
+          />
+          <span className="text-sm text-white/60 leading-snug">
+            Amigos y presencia — otros pueden ver cuándo estás estudiando
+          </span>
+        </label>
+      </div>
 
       <div className="flex flex-col gap-2 pt-1 border-t border-white/5">
         <p className="text-xs text-white/50">Cómo medís tu avance</p>
