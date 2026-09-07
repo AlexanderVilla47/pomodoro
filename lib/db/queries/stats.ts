@@ -17,7 +17,9 @@ export interface EfficiencyOpts {
  * y falla en silencio.
  *
  * A diferencia del `toNumberOrNull` de work-logs, acá un nulo cae en 0: un día
- * sin bloques suma cero al agregado, no "dato faltante".
+ * sin unidades suma cero al agregado, no "dato faltante". Desde que la query
+ * trae también las sesiones sin work_log, ese caso es lo normal y no la
+ * excepción: el LEFT JOIN devuelve NULL en todo lo que venga de `w`.
  */
 function toNumber(value: unknown): number {
   if (value === null || value === undefined) return 0;
@@ -26,15 +28,26 @@ function toNumber(value: unknown): number {
 }
 
 /**
- * Un dataset crudo por día y materia, del que salen las cuatro métricas en
+ * Un dataset crudo por día y materia, del que salen todas las métricas en
  * cualquier granularidad.
  *
  * Sólo suma y agrupa: toda la división vive en `lib/analytics/efficiency.ts`.
  * Los tests de esta capa mockean el tag `sql`, así que una fórmula escrita acá
  * sería matemática sin cobertura.
  *
- * El JOIN no infla las distracciones. Viven en `sessions` mientras que los
- * bloques viven en `work_logs`, así que sumarlas sobre el join sería doble
+ * **Arranca en `sessions`, no en `work_logs`.** Antes era al revés y eso
+ * compuertaba el informe entero detrás de las unidades: quien nunca tildaba
+ * "teoría" no veía métricas de más — no veía ninguna, para siempre. Las horas,
+ * los días y los cortes salen de `sessions` sola y no tienen por qué esperar a
+ * que alguien mida algo.
+ *
+ * Las condiciones de unidades siguen existiendo, pero como `FILTER` de los
+ * `SUM`: deciden qué se suma, no qué sesiones entran. Y el usuario se filtra
+ * por `s.user_id` — un `w.user_id` en el WHERE descartaría las filas sin log y
+ * anularía el LEFT JOIN, que es exactamente el bug que esto viene a arreglar.
+ *
+ * El JOIN no infla las distracciones. Viven en `sessions` mientras que las
+ * unidades viven en `work_logs`, así que sumarlas sobre el join sería doble
  * conteo si una sesión tuviera varios work_logs — pero hay un unique sobre
  * `session_id` (`insertWorkLog` atrapa el 23505), o sea la relación es 1:1.
  */
@@ -50,16 +63,17 @@ export async function getStudyEfficiencyByDay(
       l.name  AS label_name,
       l.color AS label_color,
       COALESCE(SUM(s.actual_duration), 0)::int   AS total_seconds,
-      COALESCE(SUM(w.chunks), 0)                 AS total_chunks,
+      COALESCE(SUM(s.actual_duration)
+        FILTER (WHERE w.is_theory AND w.chunks > 0), 0)::int AS unit_seconds,
+      COALESCE(SUM(w.chunks)
+        FILTER (WHERE w.is_theory AND w.chunks > 0), 0)      AS total_chunks,
       COUNT(*)::int                              AS sessions,
       COALESCE(SUM(s.distraction_count), 0)::int AS distractions
-    FROM work_logs w
-    JOIN sessions s ON s.id = w.session_id
+    FROM sessions s
+    LEFT JOIN work_logs w ON w.session_id = s.id
     LEFT JOIN labels l ON l.id = s.label_id
-    WHERE w.user_id = ${userId}
+    WHERE s.user_id = ${userId}
       AND s.type = 'work'
-      AND w.is_theory = true
-      AND w.chunks > 0
       AND (s.started_at + make_interval(mins => ${opts.tz}))::date >= ${opts.from}::date
       AND (s.started_at + make_interval(mins => ${opts.tz}))::date <= ${opts.to}::date
     GROUP BY day, l.id, l.name, l.color
@@ -71,6 +85,7 @@ export async function getStudyEfficiencyByDay(
     label_name: (r.label_name as string | null) ?? null,
     label_color: (r.label_color as string | null) ?? null,
     total_seconds: toNumber(r.total_seconds),
+    unit_seconds: toNumber(r.unit_seconds),
     total_chunks: toNumber(r.total_chunks),
     sessions: toNumber(r.sessions),
     distractions: toNumber(r.distractions),
