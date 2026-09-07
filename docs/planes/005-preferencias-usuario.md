@@ -1,6 +1,6 @@
 # 005 — Desacoplar Pomy de su autor: unidad configurable, informes universales y preferencias
 
-**Estado:** 🔨 En progreso — PRs 1 y 2 ✅ mergeados; **3 y 4 pendientes**
+**Estado:** 🔨 En progreso — PRs 1, 2 y 3 ✅ mergeados; **falta el 4**
 **Depende de:** [001 — Chunks de estudio](001-chunks-estudio.md), [003 — Informes de progreso](003-informes-progreso.md) y [004 — Ajustes a los informes](004-ajustes-informes.md) — ✅ los tres están
 
 ## Por qué
@@ -192,31 +192,31 @@ porque el 1 habilita a los demás:
 |---|---|---|---|---|
 | 1 | `feat/preferencias-capa` | Migración + módulo puro + API | No | ✅ PR #31 |
 | 2 | `feat/unidad-configurable` | **D** — la unidad en la UI | Sí | ✅ PR #32 |
-| 3 | `feat/informes-sin-bloques` | **E** — informes universales | Sí | 🔨 En progreso |
+| 3 | `feat/informes-sin-bloques` | **E** — informes universales | Sí | ✅ PR #34 |
 | 4 | `feat/preferencias-journal-social` | **C** — los dos toggles | Sí | ⬜ Pendiente |
 
 > ### 📍 Dónde retomar
 >
-> **El trabajo se cortó acá a pedido del usuario, con los PRs 1 y 2 en
-> producción.** El sistema quedó consistente: se puede elegir la unidad, los
-> rótulos la respetan en todos lados, y nada está a medio cablear.
+> **Queda sólo el PR 4, los dos toggles.** Los PRs 1, 2 y 3 están en
+> producción y el sistema quedó consistente: se elige la unidad, los rótulos la
+> respetan en todos lados, y los informes ya sirven sin haber cargado una sola.
 >
-> **Lo que sigue es el PR 3, y es el que arregla el bug que motivó todo el
-> plan**: hoy `getStudyEfficiencyByDay` sigue filtrando `is_theory = true AND
-> chunks > 0`, así que un usuario que nunca carga unidades **sigue viendo el
-> panel de informes vacío para siempre**. Los PRs 1 y 2 le dieron la unidad;
-> el 3 es el que le da las estadísticas.
+> **El bug que motivó el plan está arreglado.** `getStudyEfficiencyByDay`
+> arranca en `sessions` y quien nunca mide unidades ve horas, días trabajados y
+> cortes/hora. Lo que falta es lo único que ningún dato puede contestar: si
+> querés que te pregunten después de cada pomodoro, y si querés estar visible
+> para tus amigos.
 >
-> Arrancar leyendo la sección **"El modelo que ordena todo: dos niveles de
-> estadísticas"** de más arriba: es la que explica por qué la query se invierte
-> y por qué hacen falta `unit_seconds`, `hoursStudied` y `workedDays`.
+> Arrancar por la sección **"PR 4 — C: los dos toggles"** y por la regla que la
+> ordena: *si el dato ya responde la pregunta, no hagas un setting; si es
+> intrusivo o es privacidad, no lo infieras: preguntá.*
 >
-> ⚠️ **La trampa del PR 3 está escrita en su sección**: `weightedAverage` tiene
-> que dividir por `unit_seconds` y NO por `total_seconds`, o min/unidad se
-> infla en silencio.
+> ⚠️ **La decisión incómoda del PR 4 está escrita en su sección**: `social`
+> arranca en `true`, y el porqué importa más que el valor.
 
-El PR 3 (**E**) sólo depende del 2 para los rótulos. Si hay que cortar, ese es el
-punto de corte: los PRs 1–2 dejan el sistema consistente.
+El PR 4 (**C**) no depende de los anteriores: son toggles de montaje y podrían
+haberse hecho primero. Van al final porque son lo menos urgente — nadie está
+sufriendo hoy por no poder apagar el journal.
 
 ---
 
@@ -697,6 +697,21 @@ muestre menos cosas es la respuesta, no un párrafo que lo explique.
      `metric-blocks-per-day`, `metric-study-days`, las series ni `label-breakdown`
    - con unidades: se ven las seis
    - sin sesiones: `reports-empty`
+
+### Lo que apareció al implementarlo
+
+**La query no filtra por `completed`, y está bien.** `sessions` guarda también
+las sesiones abandonadas que pasan el piso de `shouldLog`. Se podría filtrar,
+pero `getStatsForToday` y `getStatsForWeek` **tampoco filtran**: si el informe
+lo hiciera, "horas estudiadas" daría un número distinto al de la tarjeta "Esta
+semana" de la home. Dos números con el mismo nombre que no coinciden es peor que
+no tener uno de los dos.
+
+**El helper que lee el WHERE en el test tiene que anclarse al arranque de
+línea.** La query ahora tiene `FILTER (WHERE w.is_theory AND w.chunks > 0)`
+inline dentro de los `SUM`, así que buscar el primer `WHERE` del texto devuelve
+uno de esos y el test pasa mirando el fragmento equivocado — verde, y sin
+verificar nada.
 
 ---
 
