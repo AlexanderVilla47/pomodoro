@@ -42,6 +42,11 @@ tsconfig.tsbuildinfo
 # SDD (artefactos de planeamiento, no van al repo)
 .atl/
 
+# El zip que descarga el generador de favicons: los PNG/ICO que hacen falta ya
+# estan sueltos en public/. Todo lo que vive en public/ lo sirve Next.js, asi
+# que un zip aca queda descargable en /favicon.zip sin que nadie lo quiera.
+public/favicon.zip
+
 # PWA (generados en build, no van al repo)
 public/sw.js
 public/workbox-*.js
