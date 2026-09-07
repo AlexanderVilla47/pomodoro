@@ -28,6 +28,20 @@ export interface Preferences {
   social: boolean;
 }
 
+/**
+ * Los dos flags arrancan en `true`, y por motivos distintos.
+ *
+ * `journal` es opt-**out** porque es el comportamiento que ya existe y lo que
+ * alimenta los informes: arrancarlo apagado sería una regresión silenciosa
+ * para quien ya lo usa.
+ *
+ * `social` en `true` es **deuda consciente, no olvido**. Lo correcto en un
+ * producto público es que la privacidad sea opt-in, pero el default se aplica a
+ * toda fila con `preferences = '{}'`: cambiarlo hoy desconectaría de golpe a
+ * todos los que ya tienen amigos, sin que nadie lo haya pedido. Cuando exista
+ * un onboarding que pregunte, `social` pasa a `false` y el onboarding se
+ * encarga de los que ya están. Ahí, y no antes.
+ */
 export const DEFAULT_PREFERENCES: Preferences = {
   unitSingular: null,
   unitPlural: null,
