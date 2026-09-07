@@ -5,7 +5,7 @@ import { StudyReports } from "../StudyReports";
 import type { EfficiencyRow } from "@/lib/analytics/efficiency";
 
 function row(partial: Partial<EfficiencyRow> & { day: string }): EfficiencyRow {
-  return {
+  const base = {
     label_id: null,
     label_name: null,
     label_color: null,
@@ -15,6 +15,10 @@ function row(partial: Partial<EfficiencyRow> & { day: string }): EfficiencyRow {
     distractions: 0,
     ...partial,
   };
+  // Por defecto todo el tiempo de la fila produjo unidades, que es como venian
+  // TODAS mientras la query filtraba por `chunks > 0`. Las filas sin unidades
+  // -- el caso que este PR abre -- quedan en 0 solas.
+  return { unit_seconds: base.total_chunks > 0 ? base.total_seconds : 0, ...base };
 }
 
 /**
@@ -49,13 +53,17 @@ describe("StudyReports", () => {
     );
   });
 
-  it("muestra las cuatro metricas del periodo actual", async () => {
+  it("muestra las seis metricas del periodo actual", async () => {
     stubRows(DOS_SEMANAS);
     render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
-    await waitFor(() => expect(valueOf("metric-minutes-per-block")).toContain("10"));
+    // Nivel 1 — sale de las sesiones
+    await waitFor(() => expect(valueOf("metric-hours")).toContain("1"));
+    expect(valueOf("metric-worked-days")).toContain("1");
+    expect(valueOf("metric-distractions-per-hour")).toContain("1");
+    // Nivel 2 — necesita unidades
+    expect(valueOf("metric-minutes-per-block")).toContain("10");
     expect(valueOf("metric-blocks-per-day")).toContain("6");
     expect(valueOf("metric-study-days")).toContain("1");
-    expect(valueOf("metric-distractions-per-hour")).toContain("1");
   });
 
   it("nunca dice chunk: ese es el nombre de la columna", async () => {
@@ -181,17 +189,16 @@ describe("StudyReports", () => {
     expect(nombres).toEqual(["RRHH", "Derecho"]);
   });
 
-  it("sin datos explica por que, en la unidad del usuario", async () => {
+  it("el vacio ya no culpa a las unidades: solo queda si no hubo ni una sesion", async () => {
     stubRows([]);
     render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => screen.getByTestId("reports-empty"));
-    // El empty state tiene que decir POR QUE esta vacio: si no, un usuario que
-    // estudio toda la semana cree que la app se rompio.
-    //
-    // Ya NO habla de "teoria": esa palabra era el encuadre de una persona. Lo
-    // que hace falta cargar es la unidad que cada uno eligio.
-    expect(screen.getByTestId("reports-empty").textContent).toMatch(/bloques/i);
-    expect(screen.getByTestId("reports-empty").textContent).not.toMatch(/teor[íi]a/i);
+    const texto = screen.getByTestId("reports-empty").textContent ?? "";
+    // Decir "cargaste bloques" seria mentir: desde que el informe arranca en
+    // las sesiones, lo unico que deja el panel vacio es no haber trabajado.
+    expect(texto).not.toMatch(/bloques/i);
+    expect(texto).not.toMatch(/teor[íi]a/i);
+    expect(texto).toMatch(/pomodoro/i);
   });
 
   it("si el fetch falla lo dice en vez de mostrar ceros", async () => {
@@ -240,5 +247,127 @@ describe("StudyReports — el rótulo es la unidad del usuario", () => {
 
     await waitFor(() => expect(screen.getAllByText("min/unidad").length).toBeGreaterThan(0));
     expect(screen.getAllByText("unidades/día").length).toBeGreaterThan(0);
+  });
+});
+
+describe("StudyReports — dos niveles: lo universal y lo que necesita unidades", () => {
+  /** Dos semanas de trabajo real sin una sola unidad cargada. */
+  const SIN_UNIDADES = [
+    row({ day: "2026-08-17", total_seconds: 3600, sessions: 2, distractions: 2 }),
+    row({ day: "2026-08-24", total_seconds: 3600, sessions: 2, distractions: 1 }),
+  ];
+
+  const METRICAS_DE_RITMO = ["minutes-per-block", "blocks-per-day", "study-days"];
+
+  it("sin unidades muestra horas, dias trabajados y cortes", async () => {
+    // El bug que motivo el plan 005, del lado de la UI: quien nunca cargo una
+    // unidad veia el empty state para siempre. Ahora ve su mes.
+    stubRows(SIN_UNIDADES);
+    render(<StudyReports onBack={vi.fn()} unit={null} />);
+
+    await waitFor(() => expect(valueOf("metric-hours")).toContain("1"));
+    expect(valueOf("metric-worked-days")).toContain("1");
+    expect(valueOf("metric-distractions-per-hour")).toContain("1");
+    expect(screen.queryByTestId("reports-empty")).toBeNull();
+  });
+
+  it("sin unidades no muestra las metricas de ritmo", async () => {
+    // No es que valgan cero: no existen. Un "0 min/unidad" seria un numero
+    // inventado sobre un dato que nadie cargo.
+    stubRows(SIN_UNIDADES);
+    render(<StudyReports onBack={vi.fn()} unit={null} />);
+
+    await waitFor(() => screen.getByTestId("metric-hours"));
+    for (const id of METRICAS_DE_RITMO) {
+      expect(screen.queryByTestId(`metric-${id}`)).toBeNull();
+    }
+  });
+
+  it("sin unidades tampoco dibuja las series ni el desglose por materia", async () => {
+    // Las dos series son de min/unidad y unidades/dia, y el desglose muestra
+    // min/unidad: sin unidades serian tres cajas vacias.
+    stubRows(SIN_UNIDADES);
+    render(<StudyReports onBack={vi.fn()} unit={null} />);
+
+    await waitFor(() => screen.getByTestId("metric-hours"));
+    expect(screen.queryByTestId("series-minutesPerBlock")).toBeNull();
+    expect(screen.queryByTestId("series-blocksPerDay")).toBeNull();
+    expect(screen.queryByTestId("label-breakdown")).toBeNull();
+  });
+
+  it("sin unidades no explica su ausencia: muestra menos cosas y listo", async () => {
+    // El 004 ya cerro esta discusion: las leyendas grises se sacaron por muro
+    // de texto. Que el panel muestre menos ES la respuesta.
+    stubRows(SIN_UNIDADES);
+    render(<StudyReports onBack={vi.fn()} unit={null} />);
+
+    await waitFor(() => screen.getByTestId("metric-hours"));
+    expect(document.body.textContent).not.toMatch(/todav[íi]a no cargaste/i);
+    expect(document.body.textContent).not.toMatch(/config[uú]r/i);
+  });
+
+  it("con la primera unidad cargada aparecen las seis, sin prender nada", async () => {
+    // Una metrica no se prende: se calcula o no se calcula. Alcanza con que
+    // haya con que calcularla.
+    stubRows([
+      SIN_UNIDADES[0],
+      row({
+        day: "2026-08-24",
+        total_seconds: 3600,
+        unit_seconds: 1800,
+        total_chunks: 3,
+        sessions: 2,
+        distractions: 1,
+      }),
+    ]);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
+
+    await waitFor(() => screen.getByTestId("metric-minutes-per-block"));
+    for (const id of METRICAS_DE_RITMO) {
+      expect(screen.getByTestId(`metric-${id}`)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("metric-hours")).toBeInTheDocument();
+    expect(screen.getByTestId("metric-worked-days")).toBeInTheDocument();
+  });
+
+  it("las horas cuentan el tiempo sin unidades y min/unidad no", async () => {
+    // La trampa del PR, verificada de punta a punta: 2 horas trabajadas, de
+    // las cuales media produjo 3 unidades. Las horas dicen 2; min/unidad
+    // divide 1800s por 3 y da 10, no 40.
+    stubRows([
+      row({
+        day: "2026-08-24",
+        total_seconds: 7200,
+        unit_seconds: 1800,
+        total_chunks: 3,
+        sessions: 4,
+        distractions: 2,
+      }),
+    ]);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
+
+    await waitFor(() => expect(valueOf("metric-hours")).toContain("2"));
+    expect(valueOf("metric-minutes-per-block")).toContain("10");
+  });
+
+  it("dias trabajados y dias con avance son metricas distintas", async () => {
+    // Tres dias sentado, uno solo con unidades. Si los dos rotulos dieran el
+    // mismo numero, uno de los dos estaria mal calculado.
+    stubRows([
+      row({ day: "2026-08-24", total_seconds: 3600, total_chunks: 4, sessions: 2 }),
+      row({ day: "2026-08-25", total_seconds: 3600, sessions: 2 }),
+      row({ day: "2026-08-26", total_seconds: 3600, sessions: 2 }),
+    ]);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
+
+    await waitFor(() => expect(valueOf("metric-worked-days")).toContain("3"));
+    expect(valueOf("metric-study-days")).toContain("1");
+  });
+
+  it("sin ninguna sesion sigue habiendo empty state", async () => {
+    stubRows([]);
+    render(<StudyReports onBack={vi.fn()} unit={null} />);
+    await waitFor(() => screen.getByTestId("reports-empty"));
+    expect(screen.queryByTestId("metric-hours")).toBeNull();
   });
 });
