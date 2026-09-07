@@ -32,6 +32,8 @@ function stubRows(rows: EfficiencyRow[]) {
   return fetchMock;
 }
 
+const BLOQUE = { singular: "bloque", plural: "bloques" };
+
 function valueOf(testId: string): string {
   return screen.getByTestId(testId).textContent ?? "";
 }
@@ -41,7 +43,7 @@ beforeEach(() => vi.restoreAllMocks());
 describe("StudyReports", () => {
   it("pide las metricas al endpoint de eficiencia", async () => {
     const fetchMock = stubRows([]);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/stats/efficiency"))
     );
@@ -49,16 +51,16 @@ describe("StudyReports", () => {
 
   it("muestra las cuatro metricas del periodo actual", async () => {
     stubRows(DOS_SEMANAS);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => expect(valueOf("metric-minutes-per-block")).toContain("10"));
     expect(valueOf("metric-blocks-per-day")).toContain("6");
     expect(valueOf("metric-study-days")).toContain("1");
     expect(valueOf("metric-distractions-per-hour")).toContain("1");
   });
 
-  it("usa la palabra bloque y no chunk", async () => {
+  it("nunca dice chunk: ese es el nombre de la columna", async () => {
     stubRows(DOS_SEMANAS);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => screen.getByTestId("metric-minutes-per-block"));
     expect(document.body.textContent).toMatch(/bloque/i);
     expect(document.body.textContent).not.toMatch(/chunk/i);
@@ -69,7 +71,7 @@ describe("StudyReports", () => {
     // direcciones opuestas. Un "verde si sube" pintaria de verde un
     // min/bloque que empeoro.
     stubRows(DOS_SEMANAS);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() =>
       expect(screen.getByTestId("trend-minutes-per-block")).toHaveAttribute("data-trend", "better")
     );
@@ -77,7 +79,7 @@ describe("StudyReports", () => {
 
   it("un bloques/dia que SUBE se marca como mejora", async () => {
     stubRows(DOS_SEMANAS);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() =>
       expect(screen.getByTestId("trend-blocks-per-day")).toHaveAttribute("data-trend", "better")
     );
@@ -85,7 +87,7 @@ describe("StudyReports", () => {
 
   it("menos distracciones por hora es mejora", async () => {
     stubRows(DOS_SEMANAS);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() =>
       expect(screen.getByTestId("trend-distractions-per-hour")).toHaveAttribute(
         "data-trend",
@@ -96,7 +98,7 @@ describe("StudyReports", () => {
 
   it("sin periodo anterior no inventa una comparacion", async () => {
     stubRows([DOS_SEMANAS[1]]);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => screen.getByTestId("metric-minutes-per-block"));
     expect(screen.queryByTestId("trend-minutes-per-block")).toBeNull();
   });
@@ -108,7 +110,7 @@ describe("StudyReports", () => {
     stubRows([
       row({ day: "2026-08-24", total_seconds: 60, total_chunks: 1, sessions: 1, distractions: 2 }),
     ]);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => expect(valueOf("metric-distractions-per-hour")).toContain("—"));
     expect(document.body.textContent).not.toMatch(/120/);
   });
@@ -117,7 +119,7 @@ describe("StudyReports", () => {
     // Decision del usuario: tres parrafos grises apilados son un muro de
     // texto. Los numeros se explican solos o no se explican.
     stubRows([DOS_SEMANAS[1]]);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => screen.getByTestId("metric-minutes-per-block"));
     expect(screen.queryByTestId("no-previous-period")).toBeNull();
     expect(screen.queryByTestId("rate-floor-hint")).toBeNull();
@@ -126,7 +128,7 @@ describe("StudyReports", () => {
 
   it("cambia de semana a mes y recalcula", async () => {
     stubRows(DOS_SEMANAS);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => expect(valueOf("metric-minutes-per-block")).toContain("10"));
 
     await userEvent.click(screen.getByRole("button", { name: /mes/i }));
@@ -156,7 +158,7 @@ describe("StudyReports", () => {
         sessions: 1,
       }),
     ]);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     // Las dos juntas: 7200s / 8 bloques = 15 min/bloque
     await waitFor(() => expect(valueOf("metric-minutes-per-block")).toContain("15"));
 
@@ -171,7 +173,7 @@ describe("StudyReports", () => {
       row({ day: "2026-08-24", label_id: 1, label_name: "RRHH", total_seconds: 3600, total_chunks: 2 }),
       row({ day: "2026-08-24", label_id: 2, label_name: "Derecho", total_seconds: 3600, total_chunks: 6 }),
     ]);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => screen.getByTestId("label-breakdown"));
     const nombres = screen
       .getAllByTestId(/^label-row-/)
@@ -179,26 +181,64 @@ describe("StudyReports", () => {
     expect(nombres).toEqual(["RRHH", "Derecho"]);
   });
 
-  it("sin datos explica que solo cuentan las sesiones de teoria", async () => {
+  it("sin datos explica por que, en la unidad del usuario", async () => {
     stubRows([]);
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => screen.getByTestId("reports-empty"));
     // El empty state tiene que decir POR QUE esta vacio: si no, un usuario que
-    // estudio toda la semana sin tildar teoria cree que la app se rompio.
-    expect(screen.getByTestId("reports-empty").textContent).toMatch(/teor[íi]a/i);
+    // estudio toda la semana cree que la app se rompio.
+    //
+    // Ya NO habla de "teoria": esa palabra era el encuadre de una persona. Lo
+    // que hace falta cargar es la unidad que cada uno eligio.
+    expect(screen.getByTestId("reports-empty").textContent).toMatch(/bloques/i);
+    expect(screen.getByTestId("reports-empty").textContent).not.toMatch(/teor[íi]a/i);
   });
 
   it("si el fetch falla lo dice en vez de mostrar ceros", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
-    render(<StudyReports onBack={vi.fn()} />);
+    render(<StudyReports onBack={vi.fn()} unit={BLOQUE} />);
     await waitFor(() => screen.getByTestId("reports-error"));
   });
 
   it("el boton de volver avisa al padre", async () => {
     stubRows(DOS_SEMANAS);
     const onBack = vi.fn();
-    render(<StudyReports onBack={onBack} />);
+    render(<StudyReports onBack={onBack} unit={BLOQUE} />);
     await userEvent.click(screen.getByRole("button", { name: /volver/i }));
     expect(onBack).toHaveBeenCalled();
+  });
+});
+
+describe("StudyReports — el rótulo es la unidad del usuario", () => {
+  const CARD = { singular: "card", plural: "cards" };
+
+  it("las métricas hablan en la unidad configurada", async () => {
+    stubRows(DOS_SEMANAS);
+    render(<StudyReports onBack={vi.fn()} unit={CARD} />);
+
+    // Aparece dos veces: como métrica del período y como título de la serie.
+    await waitFor(() => expect(screen.getAllByText("min/card").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("cards/día").length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toMatch(/bloque/i);
+  });
+
+  it("el desglose por materia también", async () => {
+    stubRows([
+      row({ day: "2026-08-17", total_seconds: 3600, total_chunks: 4, sessions: 2, label_id: 1, label_name: "Derecho" }),
+    ]);
+    render(<StudyReports onBack={vi.fn()} unit={CARD} />);
+
+    await waitFor(() => expect(screen.getByTestId("label-breakdown")).toBeInTheDocument());
+    expect(screen.getAllByText("min/card").length).toBeGreaterThan(0);
+  });
+
+  it("sin unidad configurada cae a un rótulo genérico en vez de romper", async () => {
+    // Pasa si alguien cargó datos y después dejó de medir: los chunks viejos
+    // siguen ahí y hay que rotularlos con algo que nunca sea incorrecto.
+    stubRows(DOS_SEMANAS);
+    render(<StudyReports onBack={vi.fn()} unit={null} />);
+
+    await waitFor(() => expect(screen.getAllByText("min/unidad").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("unidades/día").length).toBeGreaterThan(0);
   });
 });
