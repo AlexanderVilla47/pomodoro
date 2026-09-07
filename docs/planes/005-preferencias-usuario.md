@@ -1,6 +1,6 @@
 # 005 — Desacoplar Pomy de su autor: unidad configurable, informes universales y preferencias
 
-**Estado:** 🔨 En progreso — PR 1 de 4 (la capa)
+**Estado:** 🔨 En progreso — PRs 1 y 2 ✅ mergeados; **3 y 4 pendientes**
 **Depende de:** [001 — Chunks de estudio](001-chunks-estudio.md), [003 — Informes de progreso](003-informes-progreso.md) y [004 — Ajustes a los informes](004-ajustes-informes.md) — ✅ los tres están
 
 ## Por qué
@@ -188,12 +188,32 @@ como la salida si alguna vez molesta de verdad.
 Un cambio, una rama, un PR — y acá hay cuatro cambios distintos. En este orden,
 porque el 1 habilita a los demás:
 
-| PR | Rama | Qué entrega | Visible al usuario |
-|---|---|---|---|
-| 1 | `feat/preferencias-capa` | Migración + módulo puro + API | No |
-| 2 | `feat/unidad-configurable` | **D** — la unidad en la UI | Sí |
-| 3 | `feat/informes-sin-bloques` | **E** — informes universales | Sí |
-| 4 | `feat/preferencias-journal-social` | **C** — los dos toggles | Sí |
+| PR | Rama | Qué entrega | Visible | Estado |
+|---|---|---|---|---|
+| 1 | `feat/preferencias-capa` | Migración + módulo puro + API | No | ✅ PR #31 |
+| 2 | `feat/unidad-configurable` | **D** — la unidad en la UI | Sí | ✅ PR #32 |
+| 3 | `feat/informes-sin-bloques` | **E** — informes universales | Sí | ⬜ Pendiente |
+| 4 | `feat/preferencias-journal-social` | **C** — los dos toggles | Sí | ⬜ Pendiente |
+
+> ### 📍 Dónde retomar
+>
+> **El trabajo se cortó acá a pedido del usuario, con los PRs 1 y 2 en
+> producción.** El sistema quedó consistente: se puede elegir la unidad, los
+> rótulos la respetan en todos lados, y nada está a medio cablear.
+>
+> **Lo que sigue es el PR 3, y es el que arregla el bug que motivó todo el
+> plan**: hoy `getStudyEfficiencyByDay` sigue filtrando `is_theory = true AND
+> chunks > 0`, así que un usuario que nunca carga unidades **sigue viendo el
+> panel de informes vacío para siempre**. Los PRs 1 y 2 le dieron la unidad;
+> el 3 es el que le da las estadísticas.
+>
+> Arrancar leyendo la sección **"El modelo que ordena todo: dos niveles de
+> estadísticas"** de más arriba: es la que explica por qué la query se invierte
+> y por qué hacen falta `unit_seconds`, `hoursStudied` y `workedDays`.
+>
+> ⚠️ **La trampa del PR 3 está escrita en su sección**: `weightedAverage` tiene
+> que dividir por `unit_seconds` y NO por `total_seconds`, o min/unidad se
+> infla en silencio.
 
 El PR 3 (**E**) sólo depende del 2 para los rótulos. Si hay que cortar, ese es el
 punto de corte: los PRs 1–2 dejan el sistema consistente.
@@ -461,6 +481,20 @@ pedido: la app funciona perfecta sin que nadie la toque nunca.
 Los nombres internos de `Summary` (`minutesPerBlock`, `blocksPerDay`) tampoco se
 tocan. Son código, no UI.
 
+> **📌 Cómo llega la unidad a los componentes (decidido en el PR #32)**
+>
+> `StudyReports` y `Dashboard` la reciben **por prop**, no por `usePreferences`.
+> Motivo concreto: `useSettingsContext` lanza si no hay `SettingsProvider`, y
+> esos componentes se testean pelados. Meterle un provider a un componente para
+> leer dos strings es peor que pasarlos dos niveles. `HomeClient` es el único
+> que lee las preferencias y las reparte.
+>
+> ⚠️ **Y una regla que salió de romper un test**: `usePreferences` se apoya en
+> `useSettings`, **no** en `useSettingsContext` directo. `HomeClient.reports.test.tsx`
+> mockea `useSettings`, así que un hook que salta al contexto se escapa del
+> mock. Los hooks derivados de este repo se paran sobre otros hooks para que
+> haya **un solo punto de mockeo**.
+
 ### SettingsPanel
 
 Sección nueva, arriba del botón de guardar. **Mismo selector que el del journal**
@@ -484,14 +518,22 @@ Cómo medís tu avance                    [ Sin unidad ▾ ]
 
 #### El aviso al cambiar de unidad
 
-Si ya hay `chunks` cargados y se cambia la unidad, antes de guardar:
+> **✏️ Corregido en la implementación (PR #32): el aviso va SIN el conteo.**
+>
+> El plan pedía *"Ya cargaste 47 páginas…"*, sacando el número de un
+> `GET /api/stats/efficiency`. Eso obliga al panel de **Configuración** a
+> depender del endpoint de **informes**, que es una dependencia nueva entre dos
+> partes que hoy no se conocen.
+>
+> Y el aviso ya dice todo lo que importa sin ese número: que el historial
+> anterior está en otra unidad y que los promedios los van a sumar juntos. El
+> número era decoración cara. Lo que se implementó:
 
-> *Ya cargaste 47 páginas. Si cambiás la unidad, ese historial se va a mezclar
-> con las cards nuevas en los promedios.*
+> *Tu historial anterior está en páginas. Si cambiás la unidad, esos datos se
+> van a mezclar con los nuevos en los promedios.*
 
-El conteo sale de un `GET /api/stats/efficiency` que el panel ya sabe pedir; si
-falla, el aviso se muestra sin el número. **Avisa, no impide** — es información
-del usuario, la decisión es suya.
+Sólo aparece si **ya había** una unidad: elegir la primera no mezcla nada con
+nada. **Avisa, no impide** — es información del usuario, la decisión es suya.
 
 ### Tests del PR 2
 
