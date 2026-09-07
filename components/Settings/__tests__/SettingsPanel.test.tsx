@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsPanel } from "../SettingsPanel";
+import { DEFAULT_PREFERENCES } from "@/lib/preferences";
 
 const DEFAULT_SETTINGS = {
   id: 1,
@@ -10,6 +11,7 @@ const DEFAULT_SETTINGS = {
   long_break_duration: 900,
   long_break_interval: 4,
   notification_sound_enabled: true,
+  preferences: DEFAULT_PREFERENCES,
 };
 
 describe("SettingsPanel", () => {
