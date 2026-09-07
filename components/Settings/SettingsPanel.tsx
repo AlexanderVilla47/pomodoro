@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Settings } from "@/lib/db/queries/settings";
+import { UnitPicker, type UnitValue } from "./UnitPicker";
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -16,6 +17,23 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
   const [sound, setSound] = useState(settings.notification_sound_enabled);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const unidadGuardada: UnitValue | null =
+    settings.preferences.unitSingular && settings.preferences.unitPlural
+      ? {
+          singular: settings.preferences.unitSingular,
+          plural: settings.preferences.unitPlural,
+        }
+      : null;
+  const [unit, setUnit] = useState<UnitValue | null>(unidadGuardada);
+
+  // Los chunks viejos se cargaron en la unidad anterior y el promedio los suma
+  // sin distinguirlos. Avisa, no impide: es información del usuario y la
+  // decisión es suya. Guardar la unidad en cada work_log sería exacto, y es una
+  // columna más y una dimensión más en todo el análisis para un caso que la
+  // mayoría hace cero veces.
+  const cambiaDeUnidad =
+    unidadGuardada !== null && unit?.singular !== unidadGuardada.singular;
 
   const handleSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -49,6 +67,11 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
       long_break_duration: long * 60,
       long_break_interval: iv,
       notification_sound_enabled: sound,
+      preferences: {
+        ...settings.preferences,
+        unitSingular: unit?.singular ?? null,
+        unitPlural: unit?.plural ?? null,
+      },
     });
 
     setSaved(true);
@@ -141,6 +164,20 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
         />
         <span className="text-sm text-white/60">Sonido de notificación</span>
       </label>
+
+      <div className="flex flex-col gap-2 pt-1 border-t border-white/5">
+        <p className="text-xs text-white/50">Cómo medís tu avance</p>
+        <UnitPicker value={unit} onChange={setUnit} allowClear />
+        {cambiaDeUnidad && (
+          <p
+            role="status"
+            className="text-[10px] text-amber-300/70 bg-amber-300/10 rounded-lg px-2.5 py-1.5 leading-relaxed"
+          >
+            Tu historial anterior está en {unidadGuardada.plural}. Si cambiás la
+            unidad, esos datos se van a mezclar con los nuevos en los promedios.
+          </p>
+        )}
+      </div>
 
       <button
         type="submit"
