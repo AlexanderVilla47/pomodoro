@@ -192,7 +192,7 @@ porque el 1 habilita a los demás:
 |---|---|---|---|---|
 | 1 | `feat/preferencias-capa` | Migración + módulo puro + API | No | ✅ PR #31 |
 | 2 | `feat/unidad-configurable` | **D** — la unidad en la UI | Sí | ✅ PR #32 |
-| 3 | `feat/informes-sin-bloques` | **E** — informes universales | Sí | ⬜ Pendiente |
+| 3 | `feat/informes-sin-bloques` | **E** — informes universales | Sí | 🔨 En progreso |
 | 4 | `feat/preferencias-journal-social` | **C** — los dos toggles | Sí | ⬜ Pendiente |
 
 > ### 📍 Dónde retomar

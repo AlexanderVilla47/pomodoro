@@ -5,6 +5,8 @@ import {
   studyDays,
   blocksPerStudyDay,
   distractionsPerHour,
+  hoursStudied,
+  workedDays,
   summarize,
   groupByPeriod,
   compare,
@@ -12,9 +14,16 @@ import {
   type EfficiencyRow,
 } from "../efficiency";
 
-/** Fila cruda de la query, con defaults para no repetir lo que no importa. */
+/**
+ * Fila cruda de la query, con defaults para no repetir lo que no importa.
+ *
+ * `unit_seconds` cae por defecto en "todo el tiempo de la fila produjo
+ * unidades" cuando hay chunks cargados: es la forma que tenían TODAS las filas
+ * mientras la query filtraba por `chunks > 0`. Las filas del mundo nuevo — las
+ * que mezclan tiempo con y sin unidades — lo pasan explícito.
+ */
 function row(partial: Partial<EfficiencyRow> & { day: string }): EfficiencyRow {
-  return {
+  const base = {
     label_id: null,
     label_name: null,
     label_color: null,
@@ -24,6 +33,7 @@ function row(partial: Partial<EfficiencyRow> & { day: string }): EfficiencyRow {
     distractions: 0,
     ...partial,
   };
+  return { unit_seconds: base.total_chunks > 0 ? base.total_seconds : 0, ...base };
 }
 
 describe("minutesPerChunk", () => {
@@ -85,6 +95,29 @@ describe("weightedAverage", () => {
   it("retorna null si no hay ningún bloque cargado", () => {
     const rows = [row({ day: "2026-08-17", total_seconds: 3000, total_chunks: 0 })];
     expect(weightedAverage(rows)).toBeNull();
+  });
+
+  it("divide por el tiempo CON unidades, no por el tiempo total", () => {
+    // La trampa de abrir los informes a todo el mundo: desde que la query trae
+    // también las sesiones sin unidades, `total_seconds` incluye tiempo que no
+    // produjo ninguna. Dividir por él infla min/unidad en silencio y el número
+    // sigue pareciendo razonable — que es lo que lo vuelve peligroso.
+    //
+    // 100 min de trabajo, de los cuales 50 produjeron 2 unidades: 25, no 50.
+    const rows = [
+      row({ day: "2026-08-17", total_seconds: 6000, unit_seconds: 3000, total_chunks: 2 }),
+    ];
+    expect(weightedAverage(rows)).toBe(25);
+  });
+
+  it("pondera por el tiempo con unidades a lo largo de la serie", () => {
+    // (3000 + 1800) / (10 + 1) = 4800s / 11 unidades = 7.3 min/unidad. El
+    // tiempo sin unidades de la primera fila no entra en la cuenta.
+    const rows = [
+      row({ day: "2026-08-17", total_seconds: 6000, unit_seconds: 3000, total_chunks: 10 }),
+      row({ day: "2026-08-18", total_seconds: 1800, unit_seconds: 1800, total_chunks: 1 }),
+    ];
+    expect(weightedAverage(rows)).toBe(7.3);
   });
 });
 
@@ -205,6 +238,30 @@ describe("distractionsPerHour", () => {
     expect(distractionsPerHour(rows)).toBe(2.4);
   });
 
+  it("normaliza contra TODO el tiempo trabajado, no sólo el que midió unidades", () => {
+    // Este cambio de significado es una mejora, no un daño colateral: los
+    // cortes pasan a normalizarse contra el tiempo real de trabajo. 2 horas
+    // con 4 cortes son 2 cortes/hora, se hayan medido unidades en la mitad de
+    // ese tiempo o en ninguna. Dividir sólo por el tiempo con unidades daría 4
+    // y castigaría justo a quien mide poco.
+    const rows = [
+      row({
+        day: "2026-08-17",
+        total_seconds: 7200,
+        unit_seconds: 3600,
+        total_chunks: 2,
+        distractions: 4,
+      }),
+    ];
+    expect(distractionsPerHour(rows)).toBe(2);
+  });
+
+  it("una sesión sin unidades ya cuenta para el piso de muestra", () => {
+    // Antes ni siquiera llegaba a la función: la query la descartaba.
+    const rows = [row({ day: "2026-08-17", total_seconds: 3600, distractions: 3 })];
+    expect(distractionsPerHour(rows)).toBe(3);
+  });
+
   it("suma a lo largo del periodo antes de aplicar el piso", () => {
     // Tres sesiones cortas que solas no llegarian, pero juntas si: el piso es
     // del periodo, no de cada sesion.
@@ -217,26 +274,112 @@ describe("distractionsPerHour", () => {
   });
 });
 
+describe("hoursStudied", () => {
+  it("suma el tiempo de todas las filas y lo pasa a horas", () => {
+    const rows = [
+      row({ day: "2026-08-17", total_seconds: 3600 }),
+      row({ day: "2026-08-18", total_seconds: 1800 }),
+    ];
+    expect(hoursStudied(rows)).toBe(1.5);
+  });
+
+  it("cuenta el tiempo sin unidades: es Nivel 1, no depende de que midas nada", () => {
+    const rows = [row({ day: "2026-08-17", total_seconds: 3600, total_chunks: 0 })];
+    expect(hoursStudied(rows)).toBe(1);
+  });
+
+  it("redondea a un decimal", () => {
+    // 4000s = 1.111... horas
+    expect(hoursStudied([row({ day: "2026-08-17", total_seconds: 4000 })])).toBe(1.1);
+  });
+
+  it("una serie vacía da 0 y no null: cero horas es un dato, no un dato faltante", () => {
+    expect(hoursStudied([])).toBe(0);
+  });
+});
+
+describe("workedDays", () => {
+  it("cuenta los días distintos en los que hubo trabajo", () => {
+    const rows = [
+      row({ day: "2026-08-17", total_seconds: 3600 }),
+      row({ day: "2026-08-18", total_seconds: 1800 }),
+    ];
+    expect(workedDays(rows)).toBe(2);
+  });
+
+  it("un día con dos materias cuenta como UN día", () => {
+    // La query devuelve una fila por día + materia, igual que en studyDays.
+    const rows = [
+      row({ day: "2026-08-17", label_id: 1, total_seconds: 1800 }),
+      row({ day: "2026-08-17", label_id: 2, total_seconds: 1800 }),
+    ];
+    expect(workedDays(rows)).toBe(1);
+  });
+
+  it("NO es studyDays: cuenta los días que te sentaste, no los que mediste", () => {
+    // La confusión entre las dos es la razón por la que "días estudiados" pasó
+    // a llamarse "días con avance": conviven en el mismo panel y son distintas.
+    const rows = [
+      row({ day: "2026-08-17", total_seconds: 3600, total_chunks: 2 }),
+      row({ day: "2026-08-18", total_seconds: 3600 }),
+      row({ day: "2026-08-19", total_seconds: 3600 }),
+    ];
+    expect(workedDays(rows)).toBe(3);
+    expect(studyDays(rows)).toBe(1);
+  });
+
+  it("una serie vacía da 0", () => {
+    expect(workedDays([])).toBe(0);
+  });
+});
+
 describe("summarize", () => {
-  it("junta las cuatro métricas de un conjunto de filas", () => {
+  it("junta las métricas de los dos niveles en un solo objeto", () => {
     const rows = [
       row({ day: "2026-08-17", total_seconds: 3600, total_chunks: 4, distractions: 2 }),
       row({ day: "2026-08-19", total_seconds: 1800, total_chunks: 2, distractions: 1 }),
     ];
     expect(summarize(rows)).toEqual({
-      minutesPerBlock: 15, // 5400s / 6 bloques = 900s = 15 min
-      blocksPerDay: 3, // 6 bloques / 2 días
-      studyDays: 2,
+      // Nivel 1 — existe desde el primer pomodoro
+      hours: 1.5, // 5400s
+      workedDays: 2,
       distractionsPerHour: 2, // 3 cortes / 1.5 h
+      // Nivel 2 — sólo si hay unidades cargadas
+      minutesPerBlock: 15, // 5400s con unidades / 6 unidades = 900s = 15 min
+      blocksPerDay: 3, // 6 unidades / 2 días con avance
+      studyDays: 2,
+      totalUnits: 6,
     });
   });
 
-  it("una serie vacía da nulls y 0 días, sin romper", () => {
-    expect(summarize([])).toEqual({
+  it("sin una sola unidad, el Nivel 1 sigue teniendo números", () => {
+    // Éste es el bug que motivó el plan entero, escrito como test: quien nunca
+    // cargó una unidad tiene horas, días y cortes. Lo único que se calla es el
+    // ritmo, que sin unidades no existe.
+    const rows = [
+      row({ day: "2026-08-17", total_seconds: 3600, distractions: 2 }),
+      row({ day: "2026-08-18", total_seconds: 3600, distractions: 4 }),
+    ];
+    expect(summarize(rows)).toEqual({
+      hours: 2,
+      workedDays: 2,
+      distractionsPerHour: 3, // 6 cortes / 2 h
       minutesPerBlock: null,
       blocksPerDay: null,
       studyDays: 0,
+      totalUnits: 0,
+    });
+  });
+
+  it("una serie vacía da nulls y ceros, sin romper", () => {
+    expect(summarize([])).toEqual({
+      hours: 0,
+      workedDays: 0,
       distractionsPerHour: null,
+      minutesPerBlock: null,
+      blocksPerDay: null,
+      studyDays: 0,
+      totalUnits: 0,
     });
   });
 });
