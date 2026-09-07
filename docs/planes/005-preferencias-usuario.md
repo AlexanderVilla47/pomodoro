@@ -1,6 +1,6 @@
 # 005 — Desacoplar Pomy de su autor: unidad configurable, informes universales y preferencias
 
-**Estado:** ⬜ Pendiente
+**Estado:** 🔨 En progreso — PR 1 de 4 (la capa)
 **Depende de:** [001 — Chunks de estudio](001-chunks-estudio.md), [003 — Informes de progreso](003-informes-progreso.md) y [004 — Ajustes a los informes](004-ajustes-informes.md) — ✅ los tres están
 
 ## Por qué
