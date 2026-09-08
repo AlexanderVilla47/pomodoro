@@ -7,6 +7,8 @@ vi.mock("gsap", () => ({
   default: { to: vi.fn((obj, { onUpdate }) => { if (onUpdate) onUpdate(); return {}; }) },
 }));
 
+const UNIDAD = { singular: 'bloque', plural: 'bloques' };
+
 const STATS = {
   today: { count: 3, total_seconds: 4500 },
   week: { count: 10, total_seconds: 18000 },
@@ -30,7 +32,7 @@ describe("Dashboard", () => {
   it("llama a GET /api/stats al montar", async () => {
     const fetchMock = stubFetch();
 
-    render(<Dashboard unit={null} refreshTrigger={0} />);
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/stats"));
@@ -40,10 +42,10 @@ describe("Dashboard", () => {
   it("vuelve a fetchear cuando refreshTrigger cambia", async () => {
     const fetchMock = stubFetch();
 
-    const { rerender } = render(<Dashboard unit={null} refreshTrigger={0} />);
+    const { rerender } = render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    rerender(<Dashboard unit={null} refreshTrigger={1} />);
+    rerender(<Dashboard unit={UNIDAD} refreshTrigger={1} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 });
@@ -51,13 +53,13 @@ describe("Dashboard", () => {
 describe("Dashboard — entrada a los informes", () => {
   it("muestra el boton de informes junto a las tarjetas", async () => {
     stubFetch();
-    render(<Dashboard unit={null} refreshTrigger={0} />);
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
     expect(screen.getByRole("button", { name: /informes/i })).toBeTruthy();
   });
 
   it("abre los informes al tocarlo", async () => {
     stubFetch();
-    render(<Dashboard unit={null} refreshTrigger={0} />);
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
 
     await userEvent.click(screen.getByRole("button", { name: /informes/i }));
 
@@ -66,7 +68,7 @@ describe("Dashboard — entrada a los informes", () => {
 
   it("oculta las tarjetas mientras los informes estan abiertos", async () => {
     stubFetch();
-    render(<Dashboard unit={null} refreshTrigger={0} />);
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
     await waitFor(() => expect(screen.getByText("Hoy")).toBeTruthy());
 
     await userEvent.click(screen.getByRole("button", { name: /informes/i }));
@@ -76,7 +78,7 @@ describe("Dashboard — entrada a los informes", () => {
 
   it("vuelve a las tarjetas con la flecha", async () => {
     stubFetch();
-    render(<Dashboard unit={null} refreshTrigger={0} />);
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
     await userEvent.click(screen.getByRole("button", { name: /informes/i }));
     await waitFor(() => screen.getByRole("button", { name: /volver/i }));
 
@@ -90,7 +92,7 @@ describe("Dashboard — entrada a los informes", () => {
     // de stats esta capado en max-h-[45%], que no alcanza para los informes.
     stubFetch();
     const onViewChange = vi.fn();
-    render(<Dashboard unit={null} refreshTrigger={0} onViewChange={onViewChange} />);
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} onViewChange={onViewChange} />);
 
     await userEvent.click(screen.getByRole("button", { name: /informes/i }));
     expect(onViewChange).toHaveBeenCalledWith("analysis");
@@ -102,7 +104,23 @@ describe("Dashboard — entrada a los informes", () => {
 
   it("el boton no dice chunk", async () => {
     stubFetch();
-    render(<Dashboard unit={null} refreshTrigger={0} />);
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
     expect(document.body.textContent).not.toMatch(/chunk/i);
+  });
+});
+
+// El boton abre StudyReports, que rotula sus metricas con la unidad. Sin unidad
+// configurada el usuario declaro que no mide nada: la entrada no se le ofrece.
+describe("Dashboard — el boton sigue a la medicion", () => {
+  it("lo esconde cuando el usuario no mide su avance", async () => {
+    stubFetch();
+    render(<Dashboard unit={null} refreshTrigger={0} />);
+    expect(screen.queryByRole("button", { name: /informes/i })).not.toBeInTheDocument();
+  });
+
+  it("lo muestra cuando hay unidad", async () => {
+    stubFetch();
+    render(<Dashboard unit={UNIDAD} refreshTrigger={0} />);
+    expect(screen.getByRole("button", { name: /informes/i })).toBeInTheDocument();
   });
 });

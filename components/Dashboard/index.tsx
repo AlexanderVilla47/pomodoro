@@ -67,7 +67,9 @@ export function Dashboard({ refreshTrigger, unit, onViewChange }: DashboardProps
         el número en text-2xl más "sesiones" necesita ~84px de los 82 útiles.
         El botón se lleva ~48px y deja las tarjetas en ~140px, que sí entran.
       */}
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+      <div
+        className={`grid gap-2 ${unit ? "grid-cols-[1fr_1fr_auto]" : "grid-cols-2"}`}
+      >
         <StatsCard
           label="Hoy"
           count={today?.count ?? 0}
@@ -85,7 +87,11 @@ export function Dashboard({ refreshTrigger, unit, onViewChange }: DashboardProps
         {/*
           Un gráfico con flecha, no un "+": el más significa "agregar", y acá
           no se crea nada, se entra a un lugar.
+
+          Sin unidad no se ofrece: el usuario declaró que no mide su avance, y
+          los informes están rotulados en la unidad que no eligió.
         */}
+        {unit && (
         <button
           onClick={openReports}
           aria-label="Ver informes de estudio"
@@ -100,6 +106,7 @@ export function Dashboard({ refreshTrigger, unit, onViewChange }: DashboardProps
             <path d="M5 12h14M12 5l7 7-7 7" />
           </svg>
         </button>
+        )}
       </div>
 
     </div>
