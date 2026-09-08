@@ -145,25 +145,28 @@ algo, la unidad tiene que ser:
 Cada preset trae **singular y plural ya escritos**, así que el que elige de la
 lista nunca ve un campo de plural ni se topa con `pluralizeEs`.
 
-### Texto libre, con una puerta
+### Texto libre — implementado, y sacado después (PR #40)
 
-El que cuenta katas, commits o partituras tiene que poder escribirlo. Se permite
-cualquier texto de 1 a 24 caracteres **menos** las palabras que rompen la
-métrica:
+El plan original dejaba escribir la unidad a mano, con campos de singular y
+plural. Se hizo, se usó y se sacó: para configurar un timer había que conjugar
+un plural, y ese campo existía sólo porque `pluralizeEs` no puede adivinar los
+préstamos ("card" da "cardes") — o sea que le mostraba al usuario una limitación
+interna como si fuera una decisión suya. **La unidad se elige de la lista
+cerrada y nada más.**
+
+La validación NO se fue con la UI: `resolvePreferences` la sigue usando para
+normalizar lo que ya está guardado en la base, incluidas las unidades escritas a
+mano antes del cambio. Se rechaza cualquier texto que no tenga de 1 a 24
+caracteres, y las palabras que rompen la métrica:
 
 ```
 hora, horas, minuto, minutos, sesión, sesiones,
 pomodoro, pomodoros, día, días, semana, semanas
 ```
 
-Con un mensaje que enseña en vez de sólo negar:
-
-> *Pomy ya mide tu tiempo solo. Elegí algo que **produzcas**: páginas,
-> ejercicios, cards…*
-
 Es una función pura, `validateUnit()`, comparando sin tildes ni mayúsculas. La
-regla vive en `lib/preferences/` y no en el componente: si mañana el mismo texto
-entra por otro lado, la regla viaja con él.
+regla vive en `lib/preferences/` y no en el componente — por eso sobrevivió sin
+tocarla a que se sacara la UI que la usaba.
 
 ### Cambiar de unidad a mitad de camino
 
@@ -501,17 +504,14 @@ que se desincronizan:
 ```
 Cómo medís tu avance                    [ Sin unidad ▾ ]
   [páginas] [ejercicios] [cards] [problemas] …
-  o escribí la tuya:  [__________]  plural: [__________]
-
-  ☐ No medir mi avance      ← vuelve a null, saca la casilla del journal
+  ────────────────────────────────────
+  No medir mi avance        ← vuelve a null, saca la casilla del journal
 ```
 
-- **El plural sólo aparece en el camino de texto libre.** Los presets ya lo traen
-  resuelto: el que elige un chip nunca ve ese campo. Es el 90% de los casos.
-- En texto libre, el plural se autocompleta con `pluralizeEs(singular)` **mientras
-  no se lo edite a mano**; una vez tocado, deja de seguirlo (`pluralTouched`).
-- Validación con `validateUnit`, mostrando el mensaje que enseña cuando alguien
-  escribe "horas". Reusa el patrón de `error` que el panel ya tiene.
+- **Nadie ve nunca un campo de plural.** Los presets lo traen resuelto, y el
+  camino de texto libre se sacó (PR #40).
+- "No medir mi avance" va separado por una línea: apaga la medición entera, no es
+  una opción más de la lista. Pegado a los chips se lee como si fuera otro.
 
 #### El aviso al cambiar de unidad
 
@@ -542,9 +542,8 @@ nada. **Avisa, no impide** — es información del usuario, la decisión es suya
 2. `StudyReports.test.tsx`: los rótulos salen `min/página`, `páginas/día`
 3. `UnitPicker.test.tsx` (nuevo)
    - elegir un preset guarda singular **y** plural sin mostrar campo de plural
-   - texto libre: `"ejercicio"` prellena `"ejercicios"`; editar el plural a mano y
-     volver a tocar el singular **no** pisa lo editado
-   - `"horas"` muestra el mensaje y no guarda
+   - no hay campos para escribir una unidad (PR #40)
+   - una unidad vieja escrita a mano no marca ningún preset
    - "No medir mi avance" manda `unitSingular: null`
 
 ---
