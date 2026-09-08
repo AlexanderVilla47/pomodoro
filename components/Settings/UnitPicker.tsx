@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { UNIT_PRESETS, pluralizeEs, validateUnit } from "@/lib/preferences";
+import { UNIT_PRESETS } from "@/lib/preferences";
 
 export interface UnitValue {
   singular: string;
@@ -18,61 +17,27 @@ interface UnitPickerProps {
   allowClear?: boolean;
 }
 
-const ERRORES: Record<string, string> = {
-  empty: "Escribí una unidad.",
-  "too-long": "Máximo 24 caracteres.",
-  "is-time":
-    "Pomy ya mide tu tiempo solo. Elegí algo que produzcas: páginas, ejercicios, cards…",
-};
-
-function esPreset(singular: string): boolean {
-  return UNIT_PRESETS.some((p) => p.singular === singular);
-}
-
+/**
+ * La unidad se elige de una lista cerrada y nada más.
+ *
+ * Hubo un camino de texto libre con campos de singular y plural: para usar un
+ * timer había que conjugar un plural adentro de un panel de configuración. El
+ * plural existía porque `pluralizeEs` no puede adivinar los préstamos ("card"
+ * da "cardes"), o sea que el campo estaba exponiendo una limitación interna
+ * como si fuera una decisión del usuario.
+ *
+ * Los presets traen el plural ya escrito, así que nadie ve un campo de plural
+ * nunca más. Una unidad vieja escrita a mano sigue viva en la base y en el
+ * historial — `resolvePreferences` la sigue normalizando — pero no se puede
+ * volver a elegir, y la lista no la marca.
+ */
 export function UnitPicker({ value, onChange, allowClear = false }: UnitPickerProps) {
-  // Una unidad que no está en la lista se escribió a mano: arrancar los campos
-  // con ella es lo que permite corregir un plural sin volver a tipear todo.
-  const custom = value && !esPreset(value.singular) ? value : null;
-
-  const [singular, setSingular] = useState(custom?.singular ?? "");
-  const [plural, setPlural] = useState(custom?.plural ?? "");
-  const [pluralTouched, setPluralTouched] = useState(custom !== null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSingular = (next: string) => {
-    setSingular(next);
-    setError(null);
-    // El plural sigue al singular hasta que alguien lo edita. Después no se
-    // pisa nunca más: la app adivina una vez y el usuario tiene la última
-    // palabra, que es todo el punto de guardarlo aparte.
-    if (!pluralTouched) setPlural(pluralizeEs(next));
-  };
-
-  const handlePlural = (next: string) => {
-    setPlural(next);
-    setPluralTouched(true);
-  };
-
-  const commitCustom = () => {
-    const check = validateUnit(singular);
-    if (!check.ok) {
-      setError(ERRORES[check.reason]);
-      return;
-    }
-    const limpio = singular.trim();
-    onChange({ singular: limpio, plural: plural.trim() || pluralizeEs(limpio) });
-    setError(null);
-  };
-
   const chip = (activo: boolean) =>
     `text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
       activo
         ? "bg-[var(--color-mint)]/15 text-[var(--color-mint)] border-[var(--color-mint)]/40"
         : "bg-white/5 text-white/50 border-white/10 hover:text-white/80 hover:bg-white/10"
     }`;
-
-  const input =
-    "bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white w-full focus:outline-none focus:border-[var(--color-mint)]/50";
 
   return (
     <div className="flex flex-col gap-2">
@@ -93,58 +58,21 @@ export function UnitPicker({ value, onChange, allowClear = false }: UnitPickerPr
         })}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex gap-1.5 items-end">
-          <div className="flex-1 flex flex-col gap-0.5">
-            <label htmlFor="unit-singular" className="text-[10px] text-white/35">
-              o escribí tu unidad
-            </label>
-            <input
-              id="unit-singular"
-              type="text"
-              value={singular}
-              onChange={(e) => handleSingular(e.target.value)}
-              placeholder="kata"
-              className={input}
-            />
-          </div>
-          <div className="flex-1 flex flex-col gap-0.5">
-            <label htmlFor="unit-plural" className="text-[10px] text-white/35">
-              plural
-            </label>
-            <input
-              id="unit-plural"
-              type="text"
-              value={plural}
-              onChange={(e) => handlePlural(e.target.value)}
-              placeholder="katas"
-              className={input}
-            />
-          </div>
+      {/*
+        Separado de los chips a propósito: apaga la medición entera, no es una
+        opción más de la lista. Sin el bloque de texto libre en el medio queda
+        pegado a los chips y se lee como si fuera otro.
+      */}
+      {allowClear && value && (
+        <div className="pt-2 border-t border-white/5">
           <button
             type="button"
-            onClick={commitCustom}
-            className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 text-white/70 hover:bg-white/20 transition-colors"
+            onClick={() => onChange(null)}
+            className="text-[10px] text-white/30 hover:text-white/60 transition-colors"
           >
-            Usar
+            No medir mi avance
           </button>
         </div>
-
-        {error && (
-          <p role="alert" className="text-[10px] text-red-400 leading-relaxed">
-            {error}
-          </p>
-        )}
-      </div>
-
-      {allowClear && value && (
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="self-start text-[10px] text-white/30 hover:text-white/60 transition-colors"
-        >
-          No medir mi avance
-        </button>
       )}
     </div>
   );
