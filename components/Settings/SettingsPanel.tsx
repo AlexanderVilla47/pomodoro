@@ -26,6 +26,11 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
         }
       : null;
   const [unit, setUnit] = useState<UnitValue | null>(unidadGuardada);
+  // El interruptor de la medición, explícito. Antes lo era la unidad misma: no
+  // medir se expresaba no eligiendo nada, que es un estado que no se ve. Se
+  // guarda aparte para que destildar y volver a tildar no pierda el chip
+  // elegido si el usuario todavía no guardó.
+  const [medirAvance, setMedirAvance] = useState(unidadGuardada !== null);
 
   // Arrancan de lo guardado y no de los defaults: `settings.preferences` ya
   // viene resuelto desde `getSettings`, así que acá nunca hay un undefined que
@@ -38,8 +43,11 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
   // decisión es suya. Guardar la unidad en cada work_log sería exacto, y es una
   // columna más y una dimensión más en todo el análisis para un caso que la
   // mayoría hace cero veces.
+  // `unit !== null` importa: apagar la medición NO es cambiar de unidad. Sin esa
+  // mitad, destildar la casilla comparaba el singular contra `undefined` y
+  // disparaba un aviso de mezcla para datos nuevos que nunca van a existir.
   const cambiaDeUnidad =
-    unidadGuardada !== null && unit?.singular !== unidadGuardada.singular;
+    unidadGuardada !== null && unit !== null && unit.singular !== unidadGuardada.singular;
 
   const handleSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -75,8 +83,8 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
       notification_sound_enabled: sound,
       preferences: {
         ...settings.preferences,
-        unitSingular: unit?.singular ?? null,
-        unitPlural: unit?.plural ?? null,
+        unitSingular: medirAvance ? unit?.singular ?? null : null,
+        unitPlural: medirAvance ? unit?.plural ?? null : null,
         journal,
         social,
       },
@@ -202,11 +210,29 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
             Amigos y presencia — otros pueden ver cuándo estás estudiando
           </span>
         </label>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={medirAvance}
+            onChange={(e) => setMedirAvance(e.target.checked)}
+            className="w-4 h-4 accent-mint mt-0.5 shrink-0"
+          />
+          <span className="text-sm text-white/60 leading-snug">
+            Medir mi avance — contar cuánto producís en cada sesión, además del
+            tiempo
+          </span>
+        </label>
       </div>
 
+      {/*
+        La unidad es el detalle de una decisión que ya se tomó arriba. Mostrar
+        los nueve chips a alguien que no mide nada es pedirle que elija entre
+        opciones de algo que no prendió.
+      */}
+      {medirAvance && (
       <div className="flex flex-col gap-2 pt-1 border-t border-white/5">
         <p className="text-xs text-white/50">Cómo medís tu avance</p>
-        <UnitPicker value={unit} onChange={setUnit} allowClear />
+        <UnitPicker value={unit} onChange={setUnit} />
         {cambiaDeUnidad && (
           <p
             role="status"
@@ -217,6 +243,7 @@ export function SettingsPanel({ settings, onSave }: SettingsPanelProps) {
           </p>
         )}
       </div>
+      )}
 
       <button
         type="submit"

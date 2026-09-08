@@ -59,15 +59,12 @@ describe("UnitPicker — sin texto libre", () => {
   });
 });
 
-describe("UnitPicker — dejar de medir", () => {
-  it("no ofrece la opción por defecto", () => {
+// Apagar la medición es de quien monta el selector, no del selector: en
+// Configuración lo hace la casilla "Medir mi avance", y adentro del journal la
+// salida es no tocar nada. El componente sólo elige entre unidades.
+describe("UnitPicker — no ofrece apagar la medición", () => {
+  it("no tiene un botón para dejar de medir", () => {
     setup({ value: { singular: "card", plural: "cards" } });
     expect(screen.queryByRole("button", { name: /no medir/i })).not.toBeInTheDocument();
-  });
-
-  it("con allowClear manda null", async () => {
-    setup({ value: { singular: "card", plural: "cards" }, allowClear: true });
-    await userEvent.click(screen.getByRole("button", { name: /no medir/i }));
-    expect(onChange).toHaveBeenCalledWith(null);
   });
 });

@@ -53,15 +53,40 @@ describe("SettingsPanel — unidad de avance", () => {
     preferences: { ...DEFAULT_PREFERENCES, unitSingular: "página", unitPlural: "páginas" },
   };
 
-  it("ofrece el selector de unidad", () => {
+  const casilla = () => screen.getByRole("checkbox", { name: /medir mi avance/i });
+
+  // La casilla es el interruptor y los chips son el detalle. Antes el
+  // interruptor era la unidad misma: no medir se expresaba eligiendo nada, que
+  // es un estado que no se ve.
+  it("arranca destildada y sin chips cuando no se mide nada", () => {
     render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
+    expect(casilla()).not.toBeChecked();
+    expect(screen.queryByRole("button", { name: "cards" })).not.toBeInTheDocument();
+  });
+
+  it("arranca tildada y con los chips cuando ya hay unidad", () => {
+    render(<SettingsPanel settings={conUnidad} onSave={vi.fn()} />);
+    expect(casilla()).toBeChecked();
+    expect(screen.getByRole("button", { name: "páginas" })).toBeInTheDocument();
+  });
+
+  it("tildarla muestra los chips", async () => {
+    render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
+    await userEvent.click(casilla());
     expect(screen.getByRole("button", { name: "cards" })).toBeInTheDocument();
+  });
+
+  it("destildarla los esconde", async () => {
+    render(<SettingsPanel settings={conUnidad} onSave={vi.fn()} />);
+    await userEvent.click(casilla());
+    expect(screen.queryByRole("button", { name: "cards" })).not.toBeInTheDocument();
   });
 
   it("guarda la unidad elegida junto al resto de la configuración", async () => {
     const onSave = vi.fn();
     render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={onSave} />);
 
+    await userEvent.click(casilla());
     await userEvent.click(screen.getByRole("button", { name: "cards" }));
     await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
 
@@ -87,15 +112,25 @@ describe("SettingsPanel — unidad de avance", () => {
 
   it("no avisa nada cuando antes no había unidad", async () => {
     render(<SettingsPanel settings={DEFAULT_SETTINGS} onSave={vi.fn()} />);
+    await userEvent.click(casilla());
     await userEvent.click(screen.getByRole("button", { name: "cards" }));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("deja dejar de medir, y eso saca la casilla del journal", async () => {
+  // Apagar la medición no es cambiar de unidad: no va a haber datos nuevos con
+  // los que mezclar nada. El aviso saltaba igual porque la condición comparaba
+  // el singular contra `undefined`.
+  it("no avisa de mezcla al destildar la medición", async () => {
+    render(<SettingsPanel settings={conUnidad} onSave={vi.fn()} />);
+    await userEvent.click(casilla());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("destildarla borra la unidad, y eso saca la casilla del journal", async () => {
     const onSave = vi.fn();
     render(<SettingsPanel settings={conUnidad} onSave={onSave} />);
 
-    await userEvent.click(screen.getByRole("button", { name: /no medir/i }));
+    await userEvent.click(casilla());
     await userEvent.click(screen.getByRole("button", { name: /^guardar$/i }));
 
     await waitFor(() =>
