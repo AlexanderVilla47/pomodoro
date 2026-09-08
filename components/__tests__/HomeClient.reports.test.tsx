@@ -31,7 +31,8 @@ vi.mock("@/components/PresenceHeartbeat", () => ({ PresenceHeartbeat: stub("pres
 vi.mock("@/components/CheerPulse", () => ({ CheerPulse: stub("cheer") }));
 vi.mock("@/components/LabelSelector", () => ({ LabelSelector: stub("labels") }));
 // HomeClient hace `if (!settings) return null`, asi que sin settings no
-// renderiza nada.
+// renderiza nada. Y la unidad tiene que estar: sin ella el Dashboard no ofrece
+// la entrada a los informes, que es justo lo que estos tests abren.
 vi.mock("@/hooks/useSettings", () => ({
   useSettings: () => ({
     settings: {
@@ -40,6 +41,12 @@ vi.mock("@/hooks/useSettings", () => ({
       short_break_duration: 300,
       long_break_duration: 900,
       sessions_until_long_break: 4,
+      preferences: {
+        unitSingular: "bloque",
+        unitPlural: "bloques",
+        journal: true,
+        social: true,
+      },
     },
     updateSettings: vi.fn(),
   }),
