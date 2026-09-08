@@ -35,52 +35,27 @@ describe("UnitPicker — la lista guiada", () => {
   });
 });
 
-describe("UnitPicker — texto libre", () => {
-  it("prellena el plural mientras nadie lo edite", async () => {
+// Elegir la unidad es elegir de una lista y nada mas. Escribirla a mano obligaba
+// al usuario a conjugar un plural adentro de un panel de configuracion, que es
+// pedirle que haga de gramatico para usar un timer.
+describe("UnitPicker — sin texto libre", () => {
+  it("no ofrece campos para escribir una unidad", () => {
     setup();
-    await userEvent.type(screen.getByLabelText(/tu unidad/i), "ejercicio");
-    expect(screen.getByLabelText(/plural/i)).toHaveValue("ejercicios");
+    expect(screen.queryByLabelText(/tu unidad/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/plural/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /usar/i })).not.toBeInTheDocument();
   });
 
-  it("deja de seguir al singular una vez que se edita el plural a mano", async () => {
-    // "card" pluralizado por regla da "cardes": el usuario lo corrige una vez y
-    // la app no se lo puede volver a pisar.
-    setup();
-    await userEvent.type(screen.getByLabelText(/tu unidad/i), "card");
-    await userEvent.clear(screen.getByLabelText(/plural/i));
-    await userEvent.type(screen.getByLabelText(/plural/i), "cards");
-    await userEvent.type(screen.getByLabelText(/tu unidad/i), "s");
-
-    expect(screen.getByLabelText(/plural/i)).toHaveValue("cards");
-  });
-
-  it("guarda la unidad escrita a mano", async () => {
-    setup();
-    await userEvent.type(screen.getByLabelText(/tu unidad/i), "kata");
-    await userEvent.click(screen.getByRole("button", { name: /usar/i }));
-    expect(onChange).toHaveBeenCalledWith({ singular: "kata", plural: "katas" });
-  });
-
-  it("rechaza una unidad de tiempo y explica por qué", async () => {
-    // Con "horas" como unidad, min/hora da 60 para siempre: correcto y basura.
-    setup();
-    await userEvent.type(screen.getByLabelText(/tu unidad/i), "horas");
-    await userEvent.click(screen.getByRole("button", { name: /usar/i }));
-
-    expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(/ya mide tu tiempo/i);
-  });
-
-  it("rechaza una unidad vacía", async () => {
-    setup();
-    await userEvent.click(screen.getByRole("button", { name: /usar/i }));
-    expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-  });
-
-  it("arranca con la unidad actual cuando no es un preset, para poder editarla", () => {
+  // Una unidad vieja escrita a mano sigue viva en la base y en el historial: la
+  // lista simplemente no la marca, porque ya no se puede volver a elegir.
+  it("no marca ningún preset si la unidad guardada no está en la lista", () => {
     setup({ value: { singular: "kata", plural: "katas" } });
-    expect(screen.getByLabelText(/tu unidad/i)).toHaveValue("kata");
+    for (const preset of UNIT_PRESETS) {
+      expect(screen.getByRole("button", { name: preset.plural })).toHaveAttribute(
+        "aria-pressed",
+        "false"
+      );
+    }
   });
 });
 
